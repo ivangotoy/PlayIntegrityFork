@@ -3,6 +3,9 @@
 N="
 ";
 
+# print arguments as given on every shell: dash and mksh echo would expand backslash escapes in values
+echo() { printf '%s\n' "$*"; }
+
 case "$1" in
   -h|--help|help) echo "sh migrate.sh [-f] [-o] [-p|-j] [in-file] [out-file]"; exit 0;;
   -i|--install|install) INSTALL=1; shift;;
@@ -30,9 +33,40 @@ grep_get_prop() {
 grep_check_prop() {
   grep -q "$1" "$2" && [ "$(grep_get_prop "$1" "$2")" ];
 }
+# first word of the text after the key's colon, read as data the way the shell read it for eval set --
+# (double quotes decoded, # starts a comment after a blank); an unterminated quote gives nothing
+json_first_word() {
+  cat "$2" | tr -d '\r\n' | grep -m1 -o "$1"'".*' | cut -d: -f2- | sed 's|//|#|g' | LC_ALL=C awk '
+    {
+      s = $0; n = length(s); dq = 0; w = 0; prev = " "; word = "";
+      for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1);
+        if (dq) {
+          if (c == "\\") { i++; c = substr(s, i, 1); if (c !~ /[$`"\\]/) { if (w == 1) word = word "\\"; } }
+          else if (c == "\"") { dq = 0; prev = c; continue; }
+          if (w == 1) word = word c;
+          prev = c; continue;
+        }
+        if (c == " " || c == "\t") { if (w == 1) w = 2; prev = c; continue; }
+        if (c == "#" && (prev == " " || prev == "\t")) break;
+        if (c == "\"") dq = 1;
+        else if (w < 2) word = word c;
+        if (w == 0) w = 1;
+        prev = c;
+      }
+      if (!dq) printf "%s", word;
+    }';
+}
 grep_get_json() {
-  eval set -- "$(cat "$2" | tr -d '\r\n' | grep -m1 -o "$1"'".*' | cut -d: -f2- | sed 's|//|#|g')";
-  echo "$1" | sed -e 's|"|\\\\\\"|g' -e 's|[,}]*$||';
+  printf '%s\n' "$(json_first_word "$1" "$2")" | sed -e 's|"|\\\\\\"|g' -e 's|[,}]*$||';
+}
+# json_assign <name> <grep_get_json output> <file>: the double-quote decoding the old eval did, without eval
+json_assign() {
+  case "$(printf '%s\n' "$2" | sed 's/\\\\//g')" in
+    *\\) echo "! Refusing to migrate $3: value read for $1 ends in an unpaired backslash; file left unchanged"; exit 1;;
+  esac;
+  local value="$(printf '%s\n' "$2" | sed 's/\\\([$`"\\]\)/\1/g')";
+  eval $1=\$value;
 }
 grep_check_json() {
   grep -q "$1" "$2" && [ "$(grep_get_json "$1" "$2")" ];
@@ -190,7 +224,7 @@ ALLFIELDS="MANUFACTURER MODEL FINGERPRINT $FPFIELDS SECURITY_PATCH DEVICE_INITIA
 
 for FIELD in $ALLFIELDS; do
   case $FILE in
-    *.json) eval $FIELD=\"$(grep_get_config $FIELD)\";;
+    *.json) json_assign $FIELD "$(grep_get_config $FIELD)" "$FILE";;
     *) eval $FIELD=\"\$\(grep_get_config $FIELD\)\";;
   esac;
 done;
@@ -261,7 +295,7 @@ keep_advanced() {
     grep_check_config VERBOSE_LOGS "$1" && verboseLogs="$(grep_get_config VERBOSE_LOGS "$1")";
     for SETTING in $ADVSETTINGS; do
       case "$1" in
-        *.json) eval grep_check_config $SETTING \"$1\" \&\& $SETTING=\"$(grep_get_config $SETTING "$1")\";;
+        *.json) grep_check_config $SETTING "$1" && json_assign $SETTING "$(grep_get_config $SETTING "$1")" "$1";;
         *) grep_check_config $SETTING "$1" && eval $SETTING=\"\$\(grep_get_config $SETTING \"\$1\"\)\";;
       esac;
     done;
