@@ -55,6 +55,26 @@ check "unsafe advanced setting value not carried" has_line "$MOD/custom.pif.prop
 check "fingerprint spoofVendingFinger carried" has_line "$MOD/custom.pif.prop" "spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys"
 check "verboseLogs carried" has_line "$MOD/custom.pif.prop" "verboseLogs=3"
 
+# downloaded values with characters that break the config or sed sinks are refused
+new_root
+mkdir -p "$W/fix" && cp "$ROOT"/tests/fixtures/autopif4/* "$W/fix/"
+sed -i 's;<td>2025-01-05</td>;<td>2025-01-05\&x/y</td>;' "$W/fix/secbull.html"
+write_fetch_stubs "$W/fix"
+mkdir -p "$W/data/adb/tricky_store"
+echo "all=2024-01-01" > "$W/data/adb/tricky_store/security_patch.txt"
+run_autopif
+check "unsafe downloaded value: autopif4 fails" test "$?" -ne 0
+check "unsafe downloaded value: no config installed" test ! -e "$MOD/custom.pif.prop"
+check "unsafe downloaded value: Tricky Store file untouched" has_line "$W/data/adb/tricky_store/security_patch.txt" "all=2024-01-01"
+
+new_root
+mkdir -p "$W/fix" && cp "$ROOT"/tests/fixtures/autopif4/* "$W/fix/"
+sed -i "s;<td>Pixel Test</td>;<td>Pixel \\\$(touch $W/pwned-dl)</td>;" "$W/fix/fi.html"
+write_fetch_stubs "$W/fix"
+run_autopif
+check "shell syntax in downloaded MODEL: autopif4 fails" test "$?" -ne 0
+check "shell syntax in downloaded MODEL: no config installed" test ! -e "$MOD/custom.pif.prop"
+
 # action.sh runs autopif4 with device matching unless skipmatchdevice exists
 new_root
 write_fetch_stubs "$ROOT/tests/fixtures/autopif4"

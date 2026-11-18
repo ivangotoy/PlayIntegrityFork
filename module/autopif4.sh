@@ -189,6 +189,18 @@ esac;
 echo "$DEVICE_INITIAL_SDK_INT";
 [ "$DEVICE_INITIAL_SDK_INT" -gt 35 ] && warn "First API level 36 and greater may require an RKP keybox to pass";
 
+NL="
+"; CR="$(printf '\r')";
+for FIELD in MODEL PRODUCT DEVICE ID INCREMENTAL SECURITY_PATCH; do
+  eval VALUE=\"\$$FIELD\";
+  case "$VALUE" in
+    *\$*|*\`*|*\\*|*\"*|*"$NL"*|*"$CR"*) die "Unexpected characters in $FIELD value";;
+  esac;
+done;
+case "$SECURITY_PATCH" in
+  */*|*\&*) die "Unexpected characters in SECURITY_PATCH value";;
+esac;
+
 item "Dumping values to minimal pif.prop ...";
 cat <<EOF | tee pif.prop;
 MANUFACTURER=Google
