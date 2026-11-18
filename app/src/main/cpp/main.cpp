@@ -2,6 +2,10 @@
 #include <sys/system_properties.h>
 #include <unistd.h>
 
+#include <cerrno>
+#include <climits>
+#include <cstdlib>
+
 #include "zygisk.hpp"
 #include "json/single_include/nlohmann/json.hpp"
 #include "shadowhook.h"
@@ -128,6 +132,17 @@ static void setFieldNative(JNIEnv *env, jclass /* clazz_EntryPoint */, jclass ta
     }
 
     env->ReleaseStringUTFChars(typeObj, typeName);
+}
+
+static int toInt(const std::string &text, int fallback) {
+    errno = 0;
+    char *end = nullptr;
+    long value = strtol(text.c_str(), &end, 10);
+    if (end == text.c_str() || errno == ERANGE || value < INT_MIN || value > INT_MAX) {
+        LOGD("Couldn't parse '%s' as a number, keeping %d", text.c_str(), fallback);
+        return fallback;
+    }
+    return static_cast<int>(value);
 }
 
 class PlayIntegrityFix : public zygisk::ModuleBase {
@@ -299,7 +314,7 @@ private:
         // Verbose logging level
         if (json.contains("verboseLogs")) {
             if (!json["verboseLogs"].is_null() && json["verboseLogs"].is_string() && json["verboseLogs"] != "") {
-                verboseLogs = stoi(json["verboseLogs"].get<std::string>());
+                verboseLogs = toInt(json["verboseLogs"].get<std::string>(), verboseLogs);
                 if (verboseLogs > 0) LOGD("Verbose logging (level %d) enabled!", verboseLogs);
             } else {
                 LOGD("Error parsing verboseLogs!");
@@ -310,7 +325,7 @@ private:
         // Vending advanced spoofing settings
         if (json.contains("spoofVendingSdk")) {
             if (!json["spoofVendingSdk"].is_null() && json["spoofVendingSdk"].is_string() && json["spoofVendingSdk"] != "") {
-                spoofVendingSdk = stoi(json["spoofVendingSdk"].get<std::string>());
+                spoofVendingSdk = toInt(json["spoofVendingSdk"].get<std::string>(), spoofVendingSdk);
                 if (verboseLogs > 0) LOGD("Spoofing SDK Level in Play Store %s!", (spoofVendingSdk > 0) ? "enabled" : "disabled");
             } else {
                 LOGD("Error parsing spoofVendingSdk!");
@@ -323,7 +338,7 @@ private:
                     spoofVendingFinger = 1;
                     vendingFingerprintValue = json["spoofVendingFinger"].get<std::string>();
                 } else if (json.contains("FINGERPRINT") && !json["FINGERPRINT"].is_null() && json["FINGERPRINT"].is_string() && json["FINGERPRINT"] != "") {
-                    spoofVendingFinger = stoi(json["spoofVendingFinger"].get<std::string>());
+                    spoofVendingFinger = toInt(json["spoofVendingFinger"].get<std::string>(), spoofVendingFinger);
                     vendingFingerprintValue = json["FINGERPRINT"].get<std::string>();
                 } else {
                     LOGD("Error parsing spoofVendingFinger or FINGERPRINT field!");
@@ -342,7 +357,7 @@ private:
         // DroidGuard advanced spoofing settings
         if (json.contains("spoofBuild")) {
             if (!json["spoofBuild"].is_null() && json["spoofBuild"].is_string() && json["spoofBuild"] != "") {
-                spoofBuild = stoi(json["spoofBuild"].get<std::string>());
+                spoofBuild = toInt(json["spoofBuild"].get<std::string>(), spoofBuild);
                 if (verboseLogs > 0) LOGD("Spoofing Build Fields %s!", (spoofBuild > 0) ? "enabled" : "disabled");
             } else {
                 LOGD("Error parsing spoofBuild!");
@@ -351,7 +366,7 @@ private:
         }
         if (json.contains("spoofProps")) {
             if (!json["spoofProps"].is_null() && json["spoofProps"].is_string() && json["spoofProps"] != "") {
-                spoofProps = stoi(json["spoofProps"].get<std::string>());
+                spoofProps = toInt(json["spoofProps"].get<std::string>(), spoofProps);
                 if (verboseLogs > 0) LOGD("Spoofing System Properties %s!", (spoofProps > 0) ? "enabled" : "disabled");
             } else {
                 LOGD("Error parsing spoofProps!");
@@ -360,7 +375,7 @@ private:
         }
         if (json.contains("spoofProvider")) {
             if (!json["spoofProvider"].is_null() && json["spoofProvider"].is_string() && json["spoofProvider"] != "") {
-                spoofProvider = stoi(json["spoofProvider"].get<std::string>());
+                spoofProvider = toInt(json["spoofProvider"].get<std::string>(), spoofProvider);
                 if (verboseLogs > 0) LOGD("Spoofing Keystore Provider %s!", (spoofProvider > 0) ? "enabled" : "disabled");
             } else {
                 LOGD("Error parsing spoofProvider!");
@@ -369,7 +384,7 @@ private:
         }
         if (json.contains("spoofSignature")) {
             if (!json["spoofSignature"].is_null() && json["spoofSignature"].is_string() && json["spoofSignature"] != "") {
-                spoofSignature = stoi(json["spoofSignature"].get<std::string>());
+                spoofSignature = toInt(json["spoofSignature"].get<std::string>(), spoofSignature);
                 if (verboseLogs > 0) LOGD("Spoofing ROM Signature %s!", (spoofSignature > 0) ? "enabled" : "disabled");
             } else {
                 LOGD("Error parsing spoofSignature!");

@@ -42,3 +42,36 @@ CPPEOF
         bad "prop conversion block compiles on the host ($(head -c 300 "$N/conv.err"))"
     fi
 fi
+
+if [ -n "$CXX" ]; then
+    # numeric Advanced Settings parsing in readJson (verboseLogs line plus any helper it calls)
+    sed -n '/^static int toInt(/,/^}/p' "$CPP" > "$N/num.inc"
+    grep -m1 '^ *verboseLogs = .*json\["verboseLogs"\]' "$CPP" > "$N/num-line.inc"
+    cat > "$N/num.cpp" <<'CPPEOF'
+#include <cerrno>
+#include <climits>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#define LOGD(...) ((void)0)
+#include "num.inc"
+struct J { std::string v; template <class T> T get() const { return v; } };
+struct JS { std::string v; J operator[](const char *) const { return J{v}; } };
+static int verboseLogs = 7;
+int main(int argc, char **argv) {
+    JS json{argv[1]};
+#include "num-line.inc"
+    printf("%d\n", verboseLogs);
+    return 0;
+}
+CPPEOF
+    if [ -s "$N/num-line.inc" ] && "$CXX" $CXXFLAGS -o "$N/num" "$N/num.cpp" 2> "$N/num.err"; then
+        ok "settings parse line compiles on the host"
+        check "settings parse: number" test "$("$N/num" 3 2>/dev/null)" = 3
+        check "settings parse: leading space and trailing text as before" test "$("$N/num" " 2x" 2>/dev/null)" = 2
+        check "settings parse: non-number keeps the default" test "$("$N/num" true 2>/dev/null)" = 7
+        check "settings parse: out of range keeps the default" test "$("$N/num" 99999999999999999999 2>/dev/null)" = 7
+    else
+        bad "settings parse line compiles on the host ($(head -c 300 "$N/num.err"))"
+    fi
+fi
