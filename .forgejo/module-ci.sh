@@ -100,9 +100,10 @@ fi
 : "${RELEASE_TOKEN:?}" "${RUN_NUMBER:?}"
 API="$SERVER_URL/api/v1/repos/$REPOSITORY"
 auth() { printf 'Authorization: token %s' "$RELEASE_TOKEN"; }
-api() { local m="$1" p="$2"; shift 2; curl -sS --fail-with-body --retry 3 -X "$m" -H "$(auth)" "$@" "$API$p"; }
-http_code() { curl -sS -o /dev/null -w '%{http_code}' -H "$(auth)" "$API$1"; }
-git_auth() { git -c "http.extraHeader=$(auth)" "$@"; }
+# the token goes to curl on stdin (-H @-) and to git in GIT_CONFIG_* env, never in argv
+api() { local m="$1" p="$2"; shift 2; auth | curl -sS --fail-with-body --retry 3 -X "$m" -H @- "$@" "$API$p"; }
+http_code() { auth | curl -sS -o /dev/null -w '%{http_code}' -H @- "$API$1"; }
+git_auth() { GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="$(auth)" git "$@"; }
 
 REL="$(pwd)/rel"
 rm -rf "$REL"; mkdir -p "$REL"
@@ -223,7 +224,7 @@ log "draft release $RELEASE_ID, uploading $ZIP_NAME"
 ASSET_ID="$(api POST "/releases/$RELEASE_ID/assets?name=$ZIP_NAME" -F "attachment=@$ZIP" | jget id)"
 ASSET_URL="$(api GET "/releases/$RELEASE_ID/assets/$ASSET_ID" | jget browser_download_url)"
 log "downloading back $ASSET_URL"
-curl -sSL --fail-with-body -H "$(auth)" -o "$REL/back.zip" "$ASSET_URL"
+auth | curl -sSL --fail-with-body -H @- -o "$REL/back.zip" "$ASSET_URL"
 [ "$(sha "$REL/back.zip")" = "$ZIP_SHA" ] || die "downloaded asset sha256 differs"
 unzip -tq "$REL/back.zip" >/dev/null || die "downloaded asset fails zip test"
 
