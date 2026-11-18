@@ -347,6 +347,46 @@ async function setFlag(k,v){
   } catch(e){log(e.message,"e");}
 }
 
+// Imported custom.pif.json -> custom.pif.prop text; anything that is not a JSON object is returned as is.
+// Values are written as JSON string bodies (with # as \u0023), which is how prop values are read.
+function jsonToProp(text) {
+  const stripComments = t => {
+    let out = "", inStr = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (inStr) { out += c; if (c === "\\") { out += t[++i] || ""; } else if (c === '"') inStr = false; continue; }
+      if (c === '"') { inStr = true; out += c; continue; }
+      if (c === "/" && t[i + 1] === "/") { while (i < t.length && t[i] !== "\n") i++; out += "\n"; continue; }
+      out += c;
+    }
+    return out;
+  };
+  const enc = v => JSON.stringify(String(v)).slice(1, -1).replace(/#/g, "\\u0023");
+  const entry = (k, v) => (k.includes("=") || v === null || typeof v === "object") ? null : enc(k) + "=" + enc(v);
+  const parseEntries = t => { try { const o = JSON.parse("{" + t.trim().replace(/,$/, "") + "}"); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch (e) { return null; } };
+  let obj;
+  try { obj = JSON.parse(stripComments(text)); } catch (e) { return text; }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return text;
+  const lines = [], seen = [];
+  for (const raw of text.split("\n")) {
+    const s = raw.trim();
+    if (s === "{" || s === "}") continue;
+    if (s === "") { lines.push(""); continue; }
+    if (s.startsWith("//")) {
+      const o = parseEntries(s.slice(2));
+      const keys = o ? Object.keys(o) : [];
+      const line = keys.length === 1 ? entry(keys[0], o[keys[0]]) : null;
+      lines.push(line ? "#" + line : "# " + s.slice(2).trim());
+      continue;
+    }
+    const o = parseEntries(stripComments(s));
+    if (!o) return Object.entries(obj).map(([k, v]) => entry(k, v)).filter(Boolean).join("\n") + "\n";
+    for (const [k, v] of Object.entries(o)) { seen.push(k); const line = entry(k, v); if (line) lines.push(line); }
+  }
+  if (seen.length !== Object.keys(obj).length) return Object.entries(obj).map(([k, v]) => entry(k, v)).filter(Boolean).join("\n") + "\n";
+  return lines.join("\n").replace(/^\n+|\n+$/g, "") + "\n";
+}
+
 async function handleFileSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -358,7 +398,7 @@ async function handleFileSelect(event) {
   const reader = new FileReader();
   reader.onload = async function(e) {
     try {
-      const text = e.target.result;
+      const text = jsonToProp(e.target.result);
       // Base64 encode to safely pass file contents through the root shell
       const b64 = btoa(unescape(encodeURIComponent(text)));
       await exec(`echo "${b64}" | base64 -d > ${CFG}`);
@@ -392,7 +432,7 @@ async function submitCustomUrl() {
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = await response.text();
+    const text = jsonToProp(await response.text());
     // Base64 encode to safely pass file contents through the root shell
     const b64 = btoa(unescape(encodeURIComponent(text)));
     await exec(`echo "${b64}" | base64 -d > ${CFG}`);
