@@ -114,11 +114,42 @@ json_unsafe() {
     }
   ' "$1";
 }
+# what grep_get_json would eval for a key (its own pipeline): unquoted text must stay inert, and the
+# first word must not hold a backslash before a quote (that quote breaks out of the second eval)
+json_eval_unsafe() {
+  cat "$2" | tr -d '\r\n' | grep -m1 -o "$1"'".*' | cut -d: -f2- | sed 's|//|#|g' | awk -v key="$1" '
+    {
+      s = $0; n = length(s); dq = 0; w = 0; done = 0; prev = " ";
+      for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1);
+        if (dq) {
+          if (c == "\\") { i++; c = substr(s, i, 1); if (c !~ /[$`"\\]/) { if (w == 1) word = word "\\"; } }
+          else if (c == "\"") { dq = 0; prev = c; continue; }
+          if (w == 1) word = word c;
+          prev = c; continue;
+        }
+        if (c == " " || c == "\t") { if (w == 1) w = 2; prev = c; continue; }
+        if (c == "#" && (prev == " " || prev == "\t")) break;
+        if (c == "\"") dq = 1;
+        else if (c !~ /[][A-Za-z0-9_.,:{}+\/=#%@^-]/) { print "shell syntax in the text read for " key; exit; }
+        else if (w < 2) { w = 1; word = word c; }
+        if (w == 0) w = 1;
+        prev = c;
+      }
+      if (index(word, "\\\"")) print "backslash before a quote in the value read for " key;
+    }';
+}
 for JSONFILE in "$FILE" "$OUT"; do
   case "$JSONFILE" in
     *.json)
       [ -f "$JSONFILE" ] || continue;
       UNSAFE="$(json_unsafe "$JSONFILE")";
+      for KEY in api_level verboseLogs spoofVendingFinger MANUFACTURER MODEL FINGERPRINT BRAND PRODUCT DEVICE RELEASE ID \
+          INCREMENTAL TYPE TAGS SECURITY_PATCH DEVICE_INITIAL_SDK_INT build.fingerprint build.id product.device product.name \
+          security_patch VERBOSE_LOGS spoofBuild spoofProps spoofProvider spoofSignature spoofVendingSdk; do
+        [ -n "$UNSAFE" ] && break;
+        grep -q "$KEY" "$JSONFILE" && UNSAFE="$(json_eval_unsafe "$KEY" "$JSONFILE")";
+      done;
       if [ -n "$UNSAFE" ]; then
         echo "! Refusing to migrate $JSONFILE: $UNSAFE; file left unchanged";
         exit 1;

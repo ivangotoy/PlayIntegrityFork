@@ -149,6 +149,16 @@ check "json mid-word // text is not executed" test ! -e "$W/pwned-midword"
 json_case col0 "  \"MODEL\": \"x\",
 // note; touch @W@/pwned-col0"
 check "json column-0 // text is not executed" test ! -e "$W/pwned-col0"
+json_case valend1 "  \"MODEL\": \"x\",
+  \"FOO\": \"y BRAND\", // n: z; touch @W@/pwned-valend1"
+check "json key name at a value end, colon in a comment: not executed" test ! -e "$W/pwned-valend1"
+json_case valend2 "  \"MODEL\": \"x\",
+  \"FOO\": \"y BRAND\",
+  \"a:b; touch @W@/pwned-valend2; //\": \"v\","
+check "json key name at a value end, colon in a key: not executed" test ! -e "$W/pwned-valend2"
+json_case okcolon "  \"MODEL\": \"x\", // see: notes
+  \"FOO\": \"time 10:30\","
+check "json ordinary colons in comments and values: not refused" sh -c '! grep -q Refusing "$1"' - "$W/okcolon.out"
 json_case okcomment "  // Build Fields
   \"MODEL\": \"x\", // a note (with punctuation)
   //\"ro.build.version.security_patch\": \"2025-01-05\","
