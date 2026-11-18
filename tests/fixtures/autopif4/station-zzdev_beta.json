@@ -1,0 +1,12 @@
+{
+  "flashstationBuild": [
+    {
+      "id": "canary-202501",
+      "releaseCandidateName": "ZZ1A.250101.001",
+      "buildId": "1234567",
+      "releaseTrackVersionName": "Canary",
+      "factoryImageDownloadUrl": "https://dl.example.invalid/zzdev_beta-img.zip",
+      "canary": true
+    }
+  ]
+}
