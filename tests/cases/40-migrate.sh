@@ -177,3 +177,14 @@ json_case okcomment "  // Build Fields
   //\"ro.build.version.security_patch\": \"2025-01-05\","
 check "json word-start comments still migrate" test ! -e "$MOD/custom.pif.json.bak" -o -n "$(grep -F '"MODEL": "x"' "$MOD/custom.pif.json")"
 check "json word-start comments: not refused" sh -c '! grep -q Refusing "$1"' - "$W/okcomment.out"
+
+# without a working awk the JSON check must refuse, not pass the file to the eval-based getter
+new_root
+printf '#!/bin/sh\nexit 127\n' > "$W/bin/awk"; chmod 755 "$W/bin/awk"
+printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "x$(touch %s/pwned-noawk)",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' "$W" > "$MOD/custom.pif.json"
+cp "$MOD/custom.pif.json" "$W/orig.json"
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/noawk.out" 2>&1
+rc=$?
+check "no awk: json not executed" test ! -e "$W/pwned-noawk"
+check "no awk: refused with non-zero exit" test "$rc" -ne 0
+check "no awk: original unchanged" cmp -s "$MOD/custom.pif.json" "$W/orig.json"

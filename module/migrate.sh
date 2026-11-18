@@ -145,12 +145,12 @@ for JSONFILE in "$FILE" "$OUT"; do
   case "$JSONFILE" in
     *.json)
       [ -f "$JSONFILE" ] || continue;
-      UNSAFE="$(json_unsafe "$JSONFILE")";
+      UNSAFE="$(json_unsafe "$JSONFILE")" || UNSAFE="awk is needed to check the file";
       for KEY in api_level verboseLogs spoofVendingFinger MANUFACTURER MODEL FINGERPRINT BRAND PRODUCT DEVICE RELEASE ID \
           INCREMENTAL TYPE TAGS SECURITY_PATCH DEVICE_INITIAL_SDK_INT build.fingerprint build.id product.device product.name \
           security_patch VERBOSE_LOGS spoofBuild spoofProps spoofProvider spoofSignature spoofVendingSdk; do
         [ -n "$UNSAFE" ] && break;
-        UNSAFE="$(json_eval_unsafe "$KEY" "$JSONFILE")";
+        UNSAFE="$(json_eval_unsafe "$KEY" "$JSONFILE")" || UNSAFE="awk is needed to check the file";
       done;
       if [ -n "$UNSAFE" ]; then
         echo "! Refusing to migrate $JSONFILE: $UNSAFE; file left unchanged";
