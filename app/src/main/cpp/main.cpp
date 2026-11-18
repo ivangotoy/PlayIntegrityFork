@@ -216,7 +216,9 @@ public:
             char propDelimiter = '=';
             char commentDelimiter = '#';
             size_t beginPos = 0, endPos = 0;
-            while ((endPos = configString.find('\n', beginPos)) != std::string::npos) {
+            while (beginPos < configString.size()) {
+                endPos = configString.find('\n', beginPos);
+                if (endPos == std::string::npos) endPos = configString.size();
                 std::string line = configString.substr(beginPos, endPos - beginPos);
                 beginPos = endPos + 1;
                 if (line.empty() || line[0] == '#') continue;
