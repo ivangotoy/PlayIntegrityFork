@@ -94,3 +94,42 @@ cat > "$MOD/custom.pif.json" <<'PIF'
 PIF
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/q.out" 2>&1
 check "json escaped quote kept" has_line "$MOD/custom.pif.json" '    "MODEL": "Pixel \"Q\" Test",'
+
+# custom.pif.json content is not run as shell code (payloads only touch $W)
+new_root
+cat > "$MOD/custom.pif.json" <<PIF
+{
+  "MANUFACTURER": "Google",
+  "MODEL": "Pixel \$(touch $W/pwned-json)",
+  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"
+}
+PIF
+cp "$MOD/custom.pif.json" "$W/orig.json"
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" --install "$MOD/custom.pif.json") > "$W/j1.out" 2>&1
+rc=$?
+check "json \$() value is not executed" test ! -e "$W/pwned-json"
+check "json refused: non-zero exit" test "$rc" -ne 0
+check "json refused: warning names the file" has_text "$W/j1.out" "Refusing to migrate $MOD/custom.pif.json"
+check "json refused: original file left unchanged" cmp -s "$MOD/custom.pif.json" "$W/orig.json"
+check "json refused: no .bak written" test ! -e "$MOD/custom.pif.json.bak"
+check "json refused: value not echoed" sh -c '! grep -q "touch" "$1"' - "$W/j1.out"
+
+new_root
+cat > "$MOD/custom.pif.json" <<PIF
+{
+  "MANUFACTURER": "Google",
+  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys",
+  "BAR": "x"; touch $W/pwned-outside; "y",
+  "FOO": "\\\`touch $W/pwned-unused\\\`"
+}
+PIF
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/j2.out" 2>&1
+check "json shell syntax outside strings is not executed" test ! -e "$W/pwned-outside"
+check "json escaped backtick in an unused field is not executed" test ! -e "$W/pwned-unused"
+
+# an ordinary custom.pif.json (comments, \/ \" A, & ; ( ) < > ') migrates exactly as before
+new_root
+cp "$ROOT/tests/fixtures/migrate/sample.pif.json" "$MOD/custom.pif.json"
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/j3.out" 2>&1
+check "ordinary json: migrate exits 0" test "$?" -eq 0
+check "ordinary json: output byte-identical to the previous migrate.sh" cmp -s "$MOD/custom.pif.json" "$ROOT/tests/fixtures/migrate/sample.expected.json"

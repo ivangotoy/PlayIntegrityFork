@@ -82,6 +82,40 @@ fi;
 OUT="$2";
 [ -z "$OUT" ] && OUT="$DIR/custom.pif.$FORMAT";
 
+# grep_get_json evals file content: refuse json with $ or ` anywhere, or shell syntax outside strings
+json_unsafe() {
+  awk '
+    function bad(what) { gsub(/[^A-Za-z0-9_.*]/, "?", key); print what " near field " (key == "" ? "?" : key) " (line " NR ")"; found = 1; exit; }
+    {
+      line = $0; n = length(line);
+      for (i = 1; i <= n; i++) {
+        c = substr(line, i, 1);
+        if (c == "$" || c == "`") bad("shell expansion character");
+        if (instr) {
+          if (esc) esc = 0;
+          else if (c == "\\") esc = 1;
+          else if (c == "\"") { instr = 0; last = tok; }
+          else tok = tok c;
+        } else if (c == "\"") { instr = 1; tok = ""; }
+        else if (c == "/" && substr(line, i + 1, 1) == "/") { if (index(substr(line, i + 2), "\"") == 0) break; i++; }
+        else if (c == ":") key = last;
+        else if (c !~ /[][{},0-9A-Za-z.+ \t\r-]/) bad("shell syntax outside strings");
+      }
+    }
+  ' "$1";
+}
+for JSONFILE in "$FILE" "$OUT"; do
+  case "$JSONFILE" in
+    *.json)
+      [ -f "$JSONFILE" ] || continue;
+      UNSAFE="$(json_unsafe "$JSONFILE")";
+      if [ -n "$UNSAFE" ]; then
+        echo "! Refusing to migrate $JSONFILE: $UNSAFE; file left unchanged";
+        exit 1;
+      fi;;
+  esac;
+done;
+
 if grep_check_config api_level && grep_check_config verboseLogs && grep_check_config spoofVendingFinger; then
   [ ! "$FORCE" ] && die "No migration required";
 fi;
