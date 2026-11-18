@@ -50,3 +50,47 @@ cp "$C" "$W/before"
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" "$C") > "$W/n.out" 2>&1
 check "no migration required exits 1" test "$?" -eq 1
 check "no migration required leaves file" cmp -s "$C" "$W/before"
+
+# config values are data: shell syntax in a prop value must not run (payloads only touch $W)
+new_root
+cat > "$MOD/custom.pif.prop" <<PIF
+MANUFACTURER=Google
+MODEL=Pixel \$(touch $W/pwned-field)
+FINGERPRINT=google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys
+PIF
+cat > "$W/old.prop" <<PIF
+verboseLogs=0
+spoofBuild=1\$(touch $W/pwned-setting)
+PIF
+mkdir -p "$W/out" && cp "$W/old.prop" "$W/out/custom.pif.prop"
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.prop") > "$W/m.out" 2>&1
+check "prop field value is not executed" test ! -e "$W/pwned-field"
+check "prop field value kept literally" has_line "$MOD/custom.pif.prop" "MODEL=Pixel \$(touch $W/pwned-field)"
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.prop" "$W/out/custom.pif.prop") > "$W/m2.out" 2>&1
+check "prop advanced setting value is not executed" test ! -e "$W/pwned-setting"
+
+# WebUI import of a JSON file into custom.pif.prop, then forced prop migration
+new_root
+cat > "$MOD/custom.pif.prop" <<'PIF'
+{
+  "MANUFACTURER": "Google",
+  "MODEL": "Pixel Test",
+  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"
+}
+PIF
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -p "$MOD/custom.pif.prop") > "$W/w.out" 2>&1
+check "json content in .prop: migrate -p exits 0" test "$?" -eq 0
+check "json content in .prop: advanced settings written" has_line "$MOD/custom.pif.prop" "spoofBuild=1"
+
+# json with an escaped quote in a value keeps it escaped when rewritten as json
+new_root
+cat > "$MOD/custom.pif.json" <<'PIF'
+{
+  "MANUFACTURER": "Google",
+  "MODEL": "Pixel \"Q\" Test",
+  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys",
+  "verboseLogs": "0"
+}
+PIF
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/q.out" 2>&1
+check "json escaped quote kept" has_line "$MOD/custom.pif.json" '    "MODEL": "Pixel \"Q\" Test",'

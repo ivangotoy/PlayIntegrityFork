@@ -96,7 +96,10 @@ FPFIELDS="BRAND PRODUCT DEVICE RELEASE ID INCREMENTAL TYPE TAGS";
 ALLFIELDS="MANUFACTURER MODEL FINGERPRINT $FPFIELDS SECURITY_PATCH DEVICE_INITIAL_SDK_INT";
 
 for FIELD in $ALLFIELDS; do
-  eval $FIELD=\"$(grep_get_config $FIELD)\";
+  case $FILE in
+    *.json) eval $FIELD=\"$(grep_get_config $FIELD)\";;
+    *) eval $FIELD=\"\$\(grep_get_config $FIELD\)\";;
+  esac;
 done;
 
 if [ -n "$FINGERPRINT" ] && ! grep_check_config build.fingerprint; then
@@ -164,7 +167,10 @@ keep_advanced() {
     item "Retaining existing configuration ...";
     grep_check_config VERBOSE_LOGS "$1" && verboseLogs="$(grep_get_config VERBOSE_LOGS "$1")";
     for SETTING in $ADVSETTINGS; do
-      eval grep_check_config $SETTING \"$1\" \&\& $SETTING=\"$(grep_get_config $SETTING "$1")\";
+      case "$1" in
+        *.json) eval grep_check_config $SETTING \"$1\" \&\& $SETTING=\"$(grep_get_config $SETTING "$1")\";;
+        *) grep_check_config $SETTING "$1" && eval $SETTING=\"\$\(grep_get_config $SETTING \"\$1\"\)\";;
+      esac;
     done;
     if grep -qE '//".*security_patch"|#.*security_patch' "$1"; then
       case $FORMAT in
