@@ -37,11 +37,16 @@ new_root() {
     export PATH STUB_PROPS STUB_LOG
 }
 
-# copy_module <dest>: module/ files with device paths moved into $W
+# copy_module <dest>: module/ files with device paths moved into $W; the gitignored build
+# outputs (zygisk/, classes.dex, pif.json) left by assembleRelease are not copied
 copy_module() {
-    (cd "$ROOT/module" && find . -type d) | while read -r d; do mkdir -p "$1/$d"; done
+    (cd "$ROOT/module" && find . -type d) | while read -r d; do
+        case "$d" in ./zygisk|./zygisk/*) continue ;; esac
+        mkdir -p "$1/$d"
+    done
     (cd "$ROOT/module" && find . -type f) | while read -r f; do
         case "$f" in
+            ./zygisk/*|./classes.dex|./pif.json) ;;
             *.sh|*/update-binary)
                 sed -e "s#/data/adb#$W/data/adb#g" -e "s#/data/data/#$W/data/data/#g" \
                     -e "s#/data/system/#$W/data/system/#g" -e "s#/sys/fs/selinux#$W/sys/fs/selinux#g" \
