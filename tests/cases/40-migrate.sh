@@ -133,3 +133,24 @@ cp "$ROOT/tests/fixtures/migrate/sample.pif.json" "$MOD/custom.pif.json"
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/j3.out" 2>&1
 check "ordinary json: migrate exits 0" test "$?" -eq 0
 check "ordinary json: output byte-identical to the previous migrate.sh" cmp -s "$MOD/custom.pif.json" "$ROOT/tests/fixtures/migrate/sample.expected.json"
+
+# backslash-quote breakout of the second eval, and // that is no shell comment once newlines are gone
+json_case() {
+    # $1 marker name, $2 extra json lines (raw)
+    new_root
+    printf '{\n  "MANUFACTURER": "Google",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys",\n%s\n  "verboseLogs": "0"\n}\n' "$2" | sed "s#@W@#$W#g" > "$MOD/custom.pif.json"
+    (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/$1.out" 2>&1
+}
+json_case bsq "  \"MODEL\": \"a\\\\\\\" ; touch @W@/pwned-bsq ; : \\\\\\\"\","
+check "fixture holds the backslash-quote sequence" sh -c 'cat "$1" "$1.bak" 2>/dev/null | grep -qF "$2"' - "$MOD/custom.pif.json" 'a\\\" ; touch /'
+check "json backslash before escaped quote is not executed" test ! -e "$W/pwned-bsq"
+json_case midword "  \"MODEL\": \"x\",//; touch @W@/pwned-midword"
+check "json mid-word // text is not executed" test ! -e "$W/pwned-midword"
+json_case col0 "  \"MODEL\": \"x\",
+// note; touch @W@/pwned-col0"
+check "json column-0 // text is not executed" test ! -e "$W/pwned-col0"
+json_case okcomment "  // Build Fields
+  \"MODEL\": \"x\", // a note (with punctuation)
+  //\"ro.build.version.security_patch\": \"2025-01-05\","
+check "json word-start comments still migrate" test ! -e "$MOD/custom.pif.json.bak" -o -n "$(grep -F '"MODEL": "x"' "$MOD/custom.pif.json")"
+check "json word-start comments: not refused" sh -c '! grep -q Refusing "$1"' - "$W/okcomment.out"

@@ -92,14 +92,24 @@ json_unsafe() {
         c = substr(line, i, 1);
         if (c == "$" || c == "`") bad("shell expansion character");
         if (instr) {
-          if (esc) esc = 0;
+          if (esc) {
+            esc = 0;
+            if (c == "\\") bs++;
+            else if (c == "\"" && bs % 2) bad("backslash before an escaped quote");
+            else bs = 0;
+          }
           else if (c == "\\") esc = 1;
           else if (c == "\"") { instr = 0; last = tok; }
-          else tok = tok c;
-        } else if (c == "\"") { instr = 1; tok = ""; }
-        else if (c == "/" && substr(line, i + 1, 1) == "/") { if (index(substr(line, i + 2), "\"") == 0) break; i++; }
+          else { tok = tok c; bs = 0; }
+        } else if (c == "\"") { instr = 1; tok = ""; bs = 0; }
+        else if (c == "/" && substr(line, i + 1, 1) == "/") {
+          # with newlines removed, // only starts a shell comment after a blank
+          if (prev == " " || prev == "\t" || prev == "") { if (index(substr(line, i + 2), "\"") == 0) break; }
+          i++; c = "/";
+        }
         else if (c == ":") key = last;
         else if (c !~ /[][{},0-9A-Za-z.+ \t\r-]/) bad("shell syntax outside strings");
+        if (c != "\r") prev = c;
       }
     }
   ' "$1";
