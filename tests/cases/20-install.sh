@@ -18,14 +18,14 @@ MANUFACTURER=Google
 MODEL=Pixel Test
 spoofProvider=0
 PIF
-for f in skipdelprop skipmatchdevice skippersistprop; do touch "$MOD/$f"; done
+for f in skipaddprop skipdelprop skipmatchdevice skippersistprop; do touch "$MOD/$f"; done
 echo 'resetprop -p --delete "persist.sys.example"' > "$MOD/uninstall.sh"
 mkdir -p "$MOD/system/product/app/Example"
 setprop sys.boot_completed 1
 install_module "$NEW"
 check "install exits 0" test "$?" -eq 0
 check "custom.pif.prop restored" cmp -s "$MOD/custom.pif.prop" "$NEW/custom.pif.prop"
-for f in skipdelprop skipmatchdevice skippersistprop uninstall.sh; do
+for f in skipaddprop skipdelprop skipmatchdevice skippersistprop uninstall.sh; do
     check "$f restored" test -f "$NEW/$f"
 done
 check "disabled ROM apps restored" test -d "$NEW/system/product/app/Example"

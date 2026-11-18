@@ -26,7 +26,7 @@ if [ -d /data/adb/modules/playintegrityfix/system ]; then
 fi
 
 # Copy any supported custom files to updated module
-for FILE in custom.app_replace_list.txt custom.pif.json custom.pif.prop skipdelprop skipmatchdevice skippersistprop uninstall.sh; do
+for FILE in custom.app_replace_list.txt custom.pif.json custom.pif.prop skipaddprop skipdelprop skipmatchdevice skippersistprop uninstall.sh; do
     if [ -f "/data/adb/modules/playintegrityfix/$FILE" ]; then
         ui_print "- Restoring $FILE"
         cp -af /data/adb/modules/playintegrityfix/$FILE $MODPATH/$FILE
