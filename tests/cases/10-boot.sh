@@ -37,6 +37,15 @@ setprop ro.boot.verifiedbooterror 1
 check "skipdelprop keeps ro.boot.verifiedbooterror" has_line "$W/props" "ro.boot.verifiedbooterror=1"
 check "skipaddprop skips ro.board.first_api_level" sh -c '! grep -q "^ro.board.first_api_level=" "$1"' - "$W/props"
 
+# post-fs-data.sh, skippersistprop without an uninstall.sh
+new_root
+mkdir -p "$MOD/zygisk"
+touch "$MOD/skippersistprop"
+setprop ro.aospa.version 1
+"$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
+check "skippersistprop sets no persist props" sh -c '! grep -q "^persist.sys" "$1"' - "$W/props"
+check "skippersistprop without uninstall.sh runs nothing" sh -c '! grep -q "uninstall.sh" "$1"' - "$W/out"
+
 # post-fs-data.sh, scripts-only mode adds DroidGuard to the DenyList
 new_root
 "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1

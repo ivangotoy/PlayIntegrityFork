@@ -86,6 +86,6 @@ if ! $SKIPPERSISTPROP; then
         persistprop persist.sys.pp.gms false
         persistprop persist.sys.pp.finsky false
     fi
-elif [ "$MODPATH/uninstall.sh" ]; then
+elif [ -f "$MODPATH/uninstall.sh" ]; then
     sh $MODPATH/uninstall.sh
 fi
