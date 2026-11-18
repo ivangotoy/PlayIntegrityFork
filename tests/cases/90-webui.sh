@@ -43,3 +43,30 @@ JS
     check "import: text that is not a JSON object passes through unchanged" cmp -s "$W/broken.in" "$W/broken.out"
     check "webui: import handlers log skipped keys" test "$(grep -c 'Skipped entries a prop line' "$H")" -eq 2
 fi
+
+# every measured row (followup2 evidence: migrate.sh under bash, busybox sh, dash, mksh, then the native
+# reader): a value or key that travels is written literally, one that does not is never written
+if command -v node >/dev/null 2>&1; then
+    sed -n '/^function jsonToProp(/,/^}$/p' "$ROOT/module/webroot/index.html" > "$W/rows.js"
+    cat >> "$W/rows.js" <<'JS'
+const fs = require("fs");
+const rows = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const FP = "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys";
+const bad = [];
+for (const [name, r] of Object.entries(rows)) {
+  const obj = { MANUFACTURER: "Google", MODEL: "Pixel", FINGERPRINT: FP };
+  let k, v;
+  if (r.key !== undefined) { k = r.key; v = "val"; } else { k = r.field; v = r.value; }
+  obj[k] = v;
+  const skipped = []; let text = null;
+  try { text = jsonToProp(JSON.stringify(obj, null, 2), skipped); } catch (e) { text = null; }
+  const written = text !== null && text.split("\n").includes(k + "=" + v);
+  const dropped = text === null || skipped.includes(k);
+  if (r.travels ? !written : !dropped) bad.push(name);
+}
+console.log(bad.join(" "));
+process.exit(bad.length ? 1 : 0);
+JS
+    node "$W/rows.js" "$ROOT/tests/fixtures/webui/measured.json" > "$W/rows.out" 2>&1
+    check "import: measured travel table holds ($(head -c 200 "$W/rows.out"))" test "$?" -eq 0
+fi

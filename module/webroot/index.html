@@ -349,8 +349,9 @@ async function setFlag(k,v){
 
 // Imported custom.pif.json -> custom.pif.prop text; anything that is not a JSON object is returned as is.
 // Values are written as their literal text. Characters a prop line can't carry unchanged through
-// migrate.sh and the native reader (measured: CR, LF, tab, #, =, \, glob * ? [, {a,b}, double or
-// trailing spaces in values; = or a leading # in keys) are not written: such optional entries are
+// migrate.sh and the native reader (measured: CR, LF, tab, NUL, #, =, glob * ? [, {a,b}, double or
+// trailing spaces in values; =, NUL or a leading # in keys; in both, a backslash that starts a JSON
+// escape, which the native reader decodes) are not written: such optional entries are
 // skipped and their keys added to `skipped`; for a build field migrate.sh needs, the import fails.
 function jsonToProp(text, skipped = []) {
   const stripComments = t => {
@@ -365,7 +366,9 @@ function jsonToProp(text, skipped = []) {
     return out;
   };
   const REQUIRED = ["MANUFACTURER", "MODEL", "FINGERPRINT", "BRAND", "PRODUCT", "DEVICE", "RELEASE", "ID", "INCREMENTAL", "TYPE", "TAGS", "SECURITY_PATCH", "DEVICE_INITIAL_SDK_INT"];
-  const fits = (k, v) => !/[=\r\n]/.test(k) && !k.startsWith("#") && !/[\r\n\t#=\\*?[]|  |\s$|\{[^}]*,[^}]*\}/.test(v);
+  const jsonEscape = /\\(["\\/bfnrt]|u[0-9a-fA-F]{4})/;
+  const fits = (k, v) => !/[=\r\n\0]/.test(k) && !k.startsWith("#") && !jsonEscape.test(k) &&
+    !/[\r\n\t\0#=*?[]|  |\s$|\{[^}]*,[^}]*\}/.test(v) && !jsonEscape.test(v);
   const failed = [];
   const entry = (k, v, commented) => {
     if (v === null || typeof v === "object") return null;
@@ -376,7 +379,7 @@ function jsonToProp(text, skipped = []) {
   };
   const parseEntries = t => { try { const o = JSON.parse("{" + t.trim().replace(/,$/, "") + "}"); return o && typeof o === "object" && !Array.isArray(o) ? o : null; } catch (e) { return null; } };
   const finish = out => {
-    if (failed.length) throw new Error("Not imported: " + failed.join(", ") + " can't be written to a prop line (newline, CR, tab, #, =, \\, * ? [, {a,b}, double or trailing spaces)");
+    if (failed.length) throw new Error("Not imported: " + failed.join(", ") + " can't be written to a prop line (newline, CR, tab, NUL, #, =, * ? [, {a,b}, double or trailing spaces, backslash escapes)");
     return out;
   };
   const fromObject = () => { skipped.length = 0; failed.length = 0; return finish(Object.entries(obj).map(([k, v]) => entry(k, v, false)).filter(Boolean).join("\n") + "\n"); };

@@ -1,0 +1,334 @@
+{
+ "model_plain": {
+  "field": "MODEL",
+  "value": "Pixel Test",
+  "travels": true
+ },
+ "model_cr": {
+  "field": "MODEL",
+  "value": "a\rb",
+  "travels": false
+ },
+ "model_hash": {
+  "field": "MODEL",
+  "value": "a#b",
+  "travels": false
+ },
+ "model_eq_value": {
+  "field": "MODEL",
+  "value": "a=b",
+  "travels": false
+ },
+ "model_backslash": {
+  "field": "MODEL",
+  "value": "a\\b",
+  "travels": false
+ },
+ "model_backslash_n": {
+  "field": "MODEL",
+  "value": "a\\nb",
+  "travels": false
+ },
+ "model_dquote": {
+  "field": "MODEL",
+  "value": "a\"b",
+  "travels": true
+ },
+ "model_squote": {
+  "field": "MODEL",
+  "value": "a'b",
+  "travels": true
+ },
+ "model_tab": {
+  "field": "MODEL",
+  "value": "a\tb",
+  "travels": false
+ },
+ "model_dollar": {
+  "field": "MODEL",
+  "value": "a$b",
+  "travels": true
+ },
+ "model_dollar_paren": {
+  "field": "MODEL",
+  "value": "a$(x)b",
+  "travels": true
+ },
+ "model_backtick": {
+  "field": "MODEL",
+  "value": "a`b",
+  "travels": true
+ },
+ "model_star": {
+  "field": "MODEL",
+  "value": "a*b",
+  "travels": false,
+  "note": "glob: arrived only because no file in the working directory matched; see model_glob_star_word and model_glob_bracket_word"
+ },
+ "model_dspace": {
+  "field": "MODEL",
+  "value": "a  b",
+  "travels": false
+ },
+ "model_dslash": {
+  "field": "MODEL",
+  "value": "a//b",
+  "travels": true
+ },
+ "model_nonascii": {
+  "field": "MODEL",
+  "value": "Pixel é",
+  "travels": true
+ },
+ "model_lead_space": {
+  "field": "MODEL",
+  "value": " ab",
+  "travels": true
+ },
+ "model_trail_space": {
+  "field": "MODEL",
+  "value": "ab ",
+  "travels": false
+ },
+ "model_amp_semicolon": {
+  "field": "MODEL",
+  "value": "a & b; c",
+  "travels": true
+ },
+ "model_brace": {
+  "field": "MODEL",
+  "value": "a{b}c",
+  "travels": true
+ },
+ "model_pct": {
+  "field": "MODEL",
+  "value": "a%b",
+  "travels": true
+ },
+ "model_utf8_4": {
+  "field": "MODEL",
+  "value": "x😀",
+  "travels": true
+ },
+ "model_glob_star_word": {
+  "field": "MODEL",
+  "value": "Pixel *",
+  "travels": false
+ },
+ "model_glob_q_word": {
+  "field": "MODEL",
+  "value": "Pixel ?",
+  "travels": false,
+  "note": "glob ? matched a one-character file"
+ },
+ "model_glob_bracket_word": {
+  "field": "MODEL",
+  "value": "Pixel [cp]*",
+  "travels": false
+ },
+ "model_lead_dspace": {
+  "field": "MODEL",
+  "value": "  ab",
+  "travels": false
+ },
+ "model_tilde_word": {
+  "field": "MODEL",
+  "value": "Pixel ~",
+  "travels": true
+ },
+ "model_brace_list": {
+  "field": "MODEL",
+  "value": "a {b,c}",
+  "travels": false
+ },
+ "model_newline": {
+  "field": "MODEL",
+  "value": "a\nb",
+  "travels": false
+ },
+ "model_backslash_u": {
+  "field": "MODEL",
+  "value": "a\\u0041",
+  "travels": false
+ },
+ "model_eq_mid": {
+  "field": "MODEL",
+  "value": "x=y",
+  "travels": false
+ },
+ "key_key_hash_mid": {
+  "key": "ro.zz#k",
+  "travels": true
+ },
+ "key_key_hash_lead": {
+  "key": "#ro.zz",
+  "travels": false
+ },
+ "key_key_tab": {
+  "key": "ro.zz\tk",
+  "travels": true
+ },
+ "key_key_space": {
+  "key": "ro.zz k",
+  "travels": true
+ },
+ "key_key_bs": {
+  "key": "ro.zz\\k",
+  "travels": true
+ },
+ "key_key_dq": {
+  "key": "ro.zz\"k",
+  "travels": true
+ },
+ "key_key_nonascii": {
+  "key": "ro.zzé",
+  "travels": true
+ },
+ "key_key_eq": {
+  "key": "ro.zz=k",
+  "travels": false
+ },
+ "x_v_nul": {
+  "field": "ro.zz.v",
+  "value": "a\u0000b",
+  "travels": false
+ },
+ "x_v_c01": {
+  "field": "ro.zz.v",
+  "value": "a\u0001b",
+  "travels": true
+ },
+ "x_v_c0b": {
+  "field": "ro.zz.v",
+  "value": "a\u000bb",
+  "travels": true
+ },
+ "x_v_c0c": {
+  "field": "ro.zz.v",
+  "value": "a\fb",
+  "travels": true
+ },
+ "x_v_esc": {
+  "field": "ro.zz.v",
+  "value": "a\u001bb",
+  "travels": true
+ },
+ "x_v_del": {
+  "field": "ro.zz.v",
+  "value": "ab",
+  "travels": true
+ },
+ "x_v_dq": {
+  "field": "ro.zz.v",
+  "value": "a\"b",
+  "travels": true
+ },
+ "x_v_bs": {
+  "field": "ro.zz.v",
+  "value": "a\\b",
+  "travels": false
+ },
+ "x_v_hash": {
+  "field": "ro.zz.v",
+  "value": "a#b",
+  "travels": false
+ },
+ "x_v_nl": {
+  "field": "ro.zz.v",
+  "value": "a\nb",
+  "travels": false
+ },
+ "x_v_star": {
+  "field": "ro.zz.v",
+  "value": "a*b",
+  "travels": false
+ },
+ "x_v_dspace": {
+  "field": "ro.zz.v",
+  "value": "a  b",
+  "travels": false
+ },
+ "x_v_nonascii": {
+  "field": "ro.zz.v",
+  "value": "Pixel é",
+  "travels": true
+ },
+ "x_v_dollar": {
+  "field": "ro.zz.v",
+  "value": "a$(x)",
+  "travels": true
+ },
+ "x_k_bs_n": {
+  "key": "ro.zz\\n",
+  "travels": false
+ },
+ "x_k_bs_u": {
+  "key": "ro.zz\\u0041",
+  "travels": false
+ },
+ "x_k_bs_k": {
+  "key": "ro.zz\\k",
+  "travels": true
+ },
+ "x_k_dq": {
+  "key": "ro.zz\"k",
+  "travels": true
+ },
+ "x_k_hash_mid": {
+  "key": "ro.zz#k",
+  "travels": true
+ },
+ "x_k_hash_lead": {
+  "key": "#ro.zz",
+  "travels": false
+ },
+ "x_k_eq": {
+  "key": "ro.zz=k",
+  "travels": false
+ },
+ "x_k_tab": {
+  "key": "ro.zz\tk",
+  "travels": true
+ },
+ "x_k_nul": {
+  "key": "ro.zz\u0000k",
+  "travels": false
+ },
+ "x_k_nonascii": {
+  "key": "ro.zzé",
+  "travels": true
+ },
+ "y_v_bs_k": {
+  "field": "ro.zz.v",
+  "value": "a\\k",
+  "travels": true
+ },
+ "y_v_bs_u_short": {
+  "field": "ro.zz.v",
+  "value": "a\\u12x",
+  "travels": true
+ },
+ "y_v_bs_trail": {
+  "field": "ro.zz.v",
+  "value": "a\\",
+  "travels": true
+ },
+ "y_v_bs_mid_space": {
+  "field": "ro.zz.v",
+  "value": "a\\ b",
+  "travels": true
+ },
+ "y_model_bs_k": {
+  "field": "MODEL",
+  "value": "a\\k",
+  "travels": true
+ },
+ "y_k_bs_u_short": {
+  "key": "ro.zz\\u12x",
+  "travels": true
+ },
+ "y_k_bs_space": {
+  "key": "ro.zz\\ k",
+  "travels": true
+ }
+}
