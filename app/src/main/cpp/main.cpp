@@ -145,6 +145,59 @@ static int toInt(const std::string &text, int fallback) {
     return static_cast<int>(value);
 }
 
+// Replace bytes that are not valid UTF-8 (as nlohmann::json requires inside strings) with U+FFFD
+static std::string sanitizeUtf8(const std::string &text) {
+    std::string out;
+    size_t i = 0;
+    while (i < text.size()) {
+        auto c = static_cast<unsigned char>(text[i]);
+        size_t len = 0;
+        unsigned char lo = 0x80, hi = 0xBF;
+        if (c < 0x80) len = 1;
+        else if (c >= 0xC2 && c <= 0xDF) len = 2;
+        else if (c >= 0xE0 && c <= 0xEF) { len = 3; if (c == 0xE0) lo = 0xA0; if (c == 0xED) hi = 0x9F; }
+        else if (c >= 0xF0 && c <= 0xF4) { len = 4; if (c == 0xF0) lo = 0x90; if (c == 0xF4) hi = 0x8F; }
+        bool valid = len > 0 && i + len <= text.size();
+        for (size_t k = 1; valid && k < len; k++) {
+            auto cc = static_cast<unsigned char>(text[i + k]);
+            if (cc < (k == 1 ? lo : 0x80) || cc > (k == 1 ? hi : 0xBF)) valid = false;
+        }
+        if (valid) {
+            out.append(text, i, len);
+            i += len;
+        } else {
+            out += "\xEF\xBF\xBD";
+            i++;
+        }
+    }
+    return out;
+}
+
+// Escape a " and a \ that starts no valid JSON escape; valid escapes are kept as they are
+static std::string escapeStrayJson(const std::string &text) {
+    auto isHex = [](char h) { return (h >= '0' && h <= '9') || (h >= 'a' && h <= 'f') || (h >= 'A' && h <= 'F'); };
+    std::string out;
+    for (size_t i = 0; i < text.size(); i++) {
+        char c = text[i];
+        char next = i + 1 < text.size() ? text[i + 1] : '\0';
+        if (c == '"') {
+            out += "\\\"";
+        } else if (c != '\\') {
+            out += c;
+        } else if (next == '"' || next == '\\' || next == '/' || next == 'b' || next == 'f' || next == 'n' || next == 'r' || next == 't') {
+            out += c;
+            out += next;
+            i++;
+        } else if (next == 'u' && i + 5 < text.size() && isHex(text[i + 2]) && isHex(text[i + 3]) && isHex(text[i + 4]) && isHex(text[i + 5])) {
+            out.append(text, i, 6);
+            i += 5;
+        } else {
+            out += "\\\\";
+        }
+    }
+    return out;
+}
+
 class PlayIntegrityFix : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
@@ -222,12 +275,14 @@ public:
 
         std::string configString(configVector.cbegin(), configVector.cend());
 
+        if (!nlohmann::json::accept(configString, true)) configString = sanitizeUtf8(configString);
         if (!nlohmann::json::accept(configString, true)) {
             LOGD("Converting config from prop format to JSON format");
 
             configString.erase(std::remove(configString.begin(), configString.end(), '\r'), configString.end());
 
             std::string jsonString = "{";
+            std::vector<std::pair<std::string, std::string>> entries;
             char propDelimiter = '=';
             char commentDelimiter = '#';
             size_t beginPos = 0, endPos = 0;
@@ -266,9 +321,20 @@ public:
                     *field = escaped;
                 }
                 jsonString += "\n\"" + name + "\": \"" + value + "\",";
+                entries.emplace_back(name, value);
             }
             if (jsonString.back() == ',') jsonString.pop_back();
             jsonString += "\n}\n";
+
+            if (!nlohmann::json::accept(jsonString, true)) {
+                LOGD("Escaping stray quotes and backslashes in prop values");
+                jsonString = "{";
+                for (const auto &[entryName, entryValue] : entries) {
+                    jsonString += "\n\"" + escapeStrayJson(entryName) + "\": \"" + escapeStrayJson(entryValue) + "\",";
+                }
+                if (jsonString.back() == ',') jsonString.pop_back();
+                jsonString += "\n}\n";
+            }
 
             configString = jsonString;
 
@@ -276,6 +342,13 @@ public:
         }
 
         json = nlohmann::json::parse(configString, nullptr, false, true);
+        if (json.is_discarded() || !json.is_object()) {
+            LOGD("Couldn't parse config file");
+            json = nullptr;
+            dexVector.clear();
+            api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
 
         configVector.clear();
         configString.clear();

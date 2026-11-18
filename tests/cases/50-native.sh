@@ -13,13 +13,19 @@ else
 
     # prop -> JSON conversion block in preAppSpecialize
     sed -n '/std::string jsonString = "{";/,/configString = jsonString;/p' "$CPP" > "$N/conv.inc"
+    for h in sanitizeUtf8 escapeStrayJson; do sed -n "/^static std::string $h(/,/^}/p" "$CPP"; done > "$N/helpers.inc"
     cat > "$N/conv.cpp" <<'CPPEOF'
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
+#include <vector>
 #define LOGD(...) ((void)0)
+// no json header here: every converted config counts as valid, so only the first conversion runs
+namespace nlohmann { struct json { static bool accept(const std::string &, bool) { return true; } }; }
+#include "helpers.inc"
 static std::string convert(std::string configString) {
 #include "conv.inc"
     return configString;
@@ -73,5 +79,40 @@ CPPEOF
         check "settings parse: out of range keeps the default" test "$("$N/num" 99999999999999999999 2>/dev/null)" = 7
     else
         bad "settings parse line compiles on the host ($(head -c 300 "$N/num.err"))"
+    fi
+fi
+
+if [ -n "$CXX" ]; then
+    # helpers used when a config only fails on stray quotes/backslashes or invalid UTF-8
+    for h in sanitizeUtf8 escapeStrayJson; do sed -n "/^static std::string $h(/,/^}/p" "$CPP"; done > "$N/fix.inc"
+    for h in sanitizeUtf8 escapeStrayJson; do
+        grep -q "^static std::string $h(" "$N/fix.inc" || echo "static std::string $h(const std::string &s) { return s; }" >> "$N/fix.inc"
+    done
+    cat > "$N/fix.cpp" <<'CPPEOF'
+#include <cstdio>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include "fix.inc"
+int main(int argc, char **argv) {
+    std::stringstream ss; ss << std::cin.rdbuf();
+    std::string in = ss.str();
+    std::cout << (std::string(argv[1]) == "utf8" ? sanitizeUtf8(in) : escapeStrayJson(in));
+    return 0;
+}
+CPPEOF
+    if "$CXX" $CXXFLAGS -o "$N/fix" "$N/fix.cpp" 2> "$N/fix.err"; then
+        fx() { printf "$2" | "$N/fix" "$1" > "$N/fx.out"; printf "$3" > "$N/fx.exp"; cmp -s "$N/fx.out" "$N/fx.exp"; }
+        check "escape: valid escapes unchanged" fx esc 'a\\/b\\"c\\\\d\\u0041\\n' 'a\\/b\\"c\\\\d\\u0041\\n'
+        check "escape: raw quote escaped" fx esc 'Pixel "Q"' 'Pixel \\"Q\\"'
+        check "escape: stray backslash escaped" fx esc 'C:\\x' 'C:\\\\x'
+        check "escape: trailing backslash escaped" fx esc 'a\\' 'a\\\\'
+        check "escape: short \\u escaped" fx esc '\\u12' '\\\\u12'
+        check "utf8: valid text unchanged" fx utf8 'Pixel \303\251 \342\202\254 \360\237\230\200' 'Pixel \303\251 \342\202\254 \360\237\230\200'
+        check "utf8: invalid byte replaced" fx utf8 'a\377b' 'a\357\277\275b'
+        check "utf8: truncated tail replaced" fx utf8 'a\342\202' 'a\357\277\275\357\277\275'
+        check "utf8: overlong and surrogate replaced" fx utf8 '\300\257\355\240\200' '\357\277\275\357\277\275\357\277\275\357\277\275\357\277\275'
+    else
+        bad "config fix helpers compile on the host ($(head -c 300 "$N/fix.err"))"
     fi
 fi
