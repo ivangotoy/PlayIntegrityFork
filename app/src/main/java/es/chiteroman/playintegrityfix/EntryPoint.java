@@ -234,9 +234,19 @@ public final class EntryPoint {
         if (fieldType == String.class) {
             newValue = value;
         } else if (fieldType == int.class) {
-            newValue = Integer.parseInt(value);
+            try {
+                newValue = Integer.parseInt(value);
+            } catch (NumberFormatException e) {
+                LOG(String.format("Couldn't convert '%s' to '%s' type: %s", value, fieldType, e));
+                return;
+            }
         } else if (fieldType == long.class) {
-            newValue = Long.parseLong(value);
+            try {
+                newValue = Long.parseLong(value);
+            } catch (NumberFormatException e) {
+                LOG(String.format("Couldn't convert '%s' to '%s' type: %s", value, fieldType, e));
+                return;
+            }
         } else if (fieldType == boolean.class) {
             newValue = Boolean.parseBoolean(value);
         } else {
