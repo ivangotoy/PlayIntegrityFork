@@ -210,6 +210,67 @@ static std::string escapeStrayJson(const std::string &text) {
     return out;
 }
 
+// Companion IO: whole buffers only, retrying short counts and EINTR; false on EOF or error
+static bool readFully(int fd, void *buffer, size_t length) {
+    auto *p = static_cast<char *>(buffer);
+    while (length > 0) {
+        ssize_t n = read(fd, p, length);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) return false;
+        p += n;
+        length -= static_cast<size_t>(n);
+    }
+    return true;
+}
+
+static bool writeFully(int fd, const void *buffer, size_t length) {
+    auto *p = static_cast<const char *>(buffer);
+    while (length > 0) {
+        ssize_t n = write(fd, p, length);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) return false;
+        p += n;
+        length -= static_cast<size_t>(n);
+    }
+    return true;
+}
+
+// far above the module's classes.dex and any config file
+#define MAX_COMPANION_SIZE (64L * 1024 * 1024)
+
+// Receives dex size, config size, dex, config; false (nothing usable) unless all of it arrived
+static bool receiveFromCompanion(int fd, std::vector<char> &dexVector, std::vector<char> &configVector) {
+    long dexSize = 0, configSize = 0;
+
+    if (fd < 0 || !readFully(fd, &dexSize, sizeof(long)) || !readFully(fd, &configSize, sizeof(long))) {
+        LOGD("Couldn't read from companion");
+        return false;
+    }
+
+    if (dexSize < 1 || dexSize > MAX_COMPANION_SIZE) {
+        LOGD("Couldn't read dex file");
+        return false;
+    }
+
+    if (configSize < 1 || configSize > MAX_COMPANION_SIZE) {
+        LOGD("Couldn't read config file");
+        return false;
+    }
+
+    LOGD("Read from file descriptor for 'dex' -> %ld bytes", dexSize);
+    LOGD("Read from file descriptor for 'config' -> %ld bytes", configSize);
+
+    dexVector.resize(dexSize);
+    configVector.resize(configSize);
+    if (!readFully(fd, dexVector.data(), dexSize) || !readFully(fd, configVector.data(), configSize)) {
+        LOGD("Companion data ended early");
+        dexVector.clear();
+        configVector.clear();
+        return false;
+    }
+    return true;
+}
+
 class PlayIntegrityFix : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
@@ -253,37 +314,15 @@ public:
         }
 
         std::vector<char> configVector;
-        long dexSize = 0, configSize = 0;
 
         int fd = api->connectCompanion();
+        bool received = receiveFromCompanion(fd, dexVector, configVector);
+        if (fd >= 0) close(fd);
 
-        read(fd, &dexSize, sizeof(long));
-        read(fd, &configSize, sizeof(long));
-
-        if (dexSize < 1) {
-            close(fd);
-            LOGD("Couldn't read dex file");
+        if (!received) {
             api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
             return;
         }
-
-        if (configSize < 1) {
-            close(fd);
-            LOGD("Couldn't read config file");
-            api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
-            return;
-        }
-
-        LOGD("Read from file descriptor for 'dex' -> %ld bytes", dexSize);
-        LOGD("Read from file descriptor for 'config' -> %ld bytes", configSize);
-
-        dexVector.resize(dexSize);
-        read(fd, dexVector.data(), dexSize);
-
-        configVector.resize(configSize);
-        read(fd, configVector.data(), configSize);
-
-        close(fd);
 
         std::string configString(configVector.cbegin(), configVector.cend());
 
@@ -566,8 +605,9 @@ static void companion(int fd) {
         dexSize = ftell(dex);
         fseek(dex, 0, SEEK_SET);
 
+        if (dexSize < 0 || dexSize > MAX_COMPANION_SIZE) dexSize = 0;
         dexVector.resize(dexSize);
-        fread(dexVector.data(), 1, dexSize, dex);
+        dexSize = static_cast<long>(fread(dexVector.data(), 1, dexSize, dex));
 
         fclose(dex);
     }
@@ -585,17 +625,17 @@ static void companion(int fd) {
         configSize = ftell(config);
         fseek(config, 0, SEEK_SET);
 
+        if (configSize < 0 || configSize > MAX_COMPANION_SIZE) configSize = 0;
         configVector.resize(configSize);
-        fread(configVector.data(), 1, configSize, config);
+        configSize = static_cast<long>(fread(configVector.data(), 1, configSize, config));
 
         fclose(config);
     }
 
-    write(fd, &dexSize, sizeof(long));
-    write(fd, &configSize, sizeof(long));
-
-    write(fd, dexVector.data(), dexSize);
-    write(fd, configVector.data(), configSize);
+    if (!writeFully(fd, &dexSize, sizeof(long)) || !writeFully(fd, &configSize, sizeof(long)) ||
+        !writeFully(fd, dexVector.data(), dexSize) || !writeFully(fd, configVector.data(), configSize)) {
+        LOGD("Companion couldn't send all data");
+    }
 
     dexVector.clear();
     configVector.clear();
