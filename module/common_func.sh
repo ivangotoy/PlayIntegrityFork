@@ -33,7 +33,7 @@ persistprop() {
 
     if ! grep -q "$NAME" $MODPATH/uninstall.sh 2>/dev/null; then
         if [ "$CURVALUE" ]; then
-            [ "$NEWVALUE" = "$CURVALUE" ] || echo "resetprop -n -p \"$NAME\" \"$CURVALUE\"" >> $MODPATH/uninstall.sh
+            [ "$NEWVALUE" = "$CURVALUE" ] || printf 'resetprop -n -p "%s" '"'"'%s'"'"'\n' "$NAME" "$(printf '%s' "$CURVALUE" | sed "s/'/'\\\\''/g")" >> $MODPATH/uninstall.sh
         else
             echo "resetprop -p --delete \"$NAME\"" >> $MODPATH/uninstall.sh
         fi

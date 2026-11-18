@@ -22,11 +22,23 @@ check "missing ro.board.first_api_level added empty" has_line "$W/props" "ro.boa
 check "absent prop not created by resetprop_if_diff" sh -c '! grep -q "^ro.warranty_bit=" "$1"' - "$W/props"
 check "GMS removed from DenyList" has_line "$W/calls.log" "magisk --denylist rm com.google.android.gms"
 check "persist pihooks prop created" has_line "$W/props" "persist.sys.pihooks.first_api_level="
-check "uninstall.sh restores changed persist prop" has_line "$MOD/uninstall.sh" 'resetprop -n -p "persist.sys.pihooks.disable.gms_props" "false"'
+check "uninstall.sh restores changed persist prop" has_line "$MOD/uninstall.sh" "resetprop -n -p \"persist.sys.pihooks.disable.gms_props\" 'false'"
 check "uninstall.sh deletes created persist prop" has_line "$MOD/uninstall.sh" 'resetprop -p --delete "persist.sys.pihooks.first_api_level"'
 n1="$(wc -l < "$MOD/uninstall.sh")"
 "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out2" 2>&1
 check "second boot adds no duplicate uninstall.sh entries" test "$(wc -l < "$MOD/uninstall.sh")" -eq "$n1"
+
+# common_func.sh: a current property value is written into uninstall.sh as data, never as shell code
+new_root
+mkdir -p "$MOD/zygisk"
+setprop ro.aospa.version 1
+ODD="a\"b\$(touch $W/pwned-uninst)c'd \`x\`"
+setprop persist.sys.pihooks.disable.gms_props "$ODD"
+"$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
+check "odd prop value: post-fs-data.sh ran nothing from it" test ! -e "$W/pwned-uninst"
+"$TEST_SH" "$MOD/uninstall.sh" > "$W/out-uninst" 2>&1
+check "odd prop value: uninstall.sh runs no code from it" test ! -e "$W/pwned-uninst"
+check "odd prop value: uninstall.sh restores it byte for byte" test "$(prop persist.sys.pihooks.disable.gms_props)" = "$ODD"
 
 # post-fs-data.sh, skip marker files
 new_root
