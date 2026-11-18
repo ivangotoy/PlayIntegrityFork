@@ -13,6 +13,7 @@ mkdir -p "$W/data/adb/tricky_store"
 echo "all=2024-01-01" > "$W/data/adb/tricky_store/security_patch.txt"
 run_autopif -m
 check "autopif4 exits 0" test "$?" -eq 0
+CASE_FIRST_LOG="$W/calls.log"
 C="$MOD/custom.pif.prop"
 check "custom.pif.prop installed" test -f "$C"
 check "MODEL from device list" has_line "$C" "MODEL=Pixel Test"
@@ -83,6 +84,17 @@ write_fetch_stubs "$W/fix"
 run_autopif
 check "CRLF bulletin: autopif4 exits 0" test "$?" -eq 0
 check "CRLF bulletin: clean SECURITY_PATCH" has_line "$MOD/custom.pif.prop" "SECURITY_PATCH=2025-01-05"
+
+# a factory image URL whose host is not a plain hostname never reaches nc as extra arguments
+new_root
+mkdir -p "$W/fix" && cp "$ROOT"/tests/fixtures/autopif4/* "$W/fix/"
+sed -i 's;"https://dl.example.invalid/;"https://dl.example.invalid -x extra/;' "$W/fix/station-zzdev_beta.json"
+write_fetch_stubs "$W/fix"
+run_autopif
+check "odd image host: autopif4 exits 0" test "$?" -eq 0
+check "odd image host: nc gets no extra arguments" sh -c '! grep "^nc " "$1" | grep -v -x "nc [A-Za-z0-9.-]* 80" | grep -q .' - "$W/calls.log"
+check "odd image host: config installed" test -f "$MOD/custom.pif.prop"
+check "plain image host still probed with nc" sh -c 'grep -q -x "nc dl.example.invalid 80" "$1"' - "$CASE_FIRST_LOG"
 
 # action.sh runs autopif4 with device matching unless skipmatchdevice exists
 new_root

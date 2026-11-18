@@ -134,8 +134,11 @@ echo "Android $(grep 'releaseTrackVersionName' PIXEL_CANARY_JSON | cut -d\" -f4)
 FI="$(grep 'factoryImageDownloadUrl' PIXEL_CANARY_JSON | cut -d\" -f4)";
 FI_HOST="$(echo "$FI" | sed 's;^.*://\(.*\)$;\1;' | cut -d/ -f1)";
 FI_PATH="/$(echo "$FI" | sed 's;^.*://\(.*\)$;\1;' | cut -d/ -f2-)";
+case "$FI_HOST" in
+  -*|*[!A-Za-z0-9.-]*) FI_HOST="";;
+esac;
 if [ "$FI" -a "$FI_HOST" -a "$FI_PATH" ]; then
-  nc $FI_HOST 80 <<EOF | tr -d '\r' > PIXEL_ZIP_HEADERS;
+  nc "$FI_HOST" 80 <<EOF | tr -d '\r' > PIXEL_ZIP_HEADERS;
 HEAD $FI_PATH HTTP/1.1
 Host: $FI_HOST
 Connection: close
