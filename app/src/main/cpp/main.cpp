@@ -237,6 +237,19 @@ public:
                     size_t lastPos = value.find_last_not_of(" ");
                     if (lastPos != std::string::npos) value.resize(lastPos + 1);
                 }
+                for (std::string *field : {&name, &value}) {
+                    std::string escaped;
+                    for (unsigned char c : *field) {
+                        if (c < 0x20) {
+                            char hex[7];
+                            snprintf(hex, sizeof(hex), "\\u%04x", c);
+                            escaped += hex;
+                        } else {
+                            escaped += static_cast<char>(c);
+                        }
+                    }
+                    *field = escaped;
+                }
                 jsonString += "\n\"" + name + "\": \"" + value + "\",";
             }
             if (jsonString.back() == ',') jsonString.pop_back();

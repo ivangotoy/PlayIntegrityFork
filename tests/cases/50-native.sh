@@ -33,6 +33,11 @@ CPPEOF
         check "prop conversion: terminated lines" cmp -s "$N/out1" "$N/exp1"
         printf 'MODEL=Pixel Test\nspoofProvider=0' | "$N/conv" > "$N/out2"
         check "prop conversion: unterminated last line kept" has_line "$N/out2" '"spoofProvider": "0"'
+        printf 'MODEL=Pixel\tTest\nspoofBuild=0\t# c\n' | "$N/conv" > "$N/out3"
+        check "prop conversion: control characters escaped" has_line "$N/out3" '"MODEL": "Pixel\u0009Test",'
+        check "prop conversion: no raw control characters" sh -c '! tr -d "\n" < "$1" | grep -q "$(printf "\t")"' - "$N/out3"
+        printf 'MODEL=Pixel \\"Q\\"\n' | "$N/conv" > "$N/out4"
+        check "prop conversion: JSON escapes in values pass through" has_line "$N/out4" '"MODEL": "Pixel \"Q\""'
     else
         bad "prop conversion block compiles on the host ($(head -c 300 "$N/conv.err"))"
     fi
