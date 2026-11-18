@@ -14,6 +14,9 @@ sys.exit(0 if build and not any(k.startswith(sys.argv[2]) for s in build for k i
 else
     skip "yaml: build step env (no python3 yaml module)"
 fi
-check "only module-ci.sh mentions $S outside tests/" sh -c '
-cd "$1" && ! find . \( -path ./.git -o -path ./tests \) -prune -o -type f -exec grep -l "$2" {} + | grep -v "^./.forgejo/module-ci.sh$" | grep -q .' - "$ROOT" "$S"
+# fixed source list: build outputs and fetched third-party sources contain unrelated SIGN_ strings
+check "no build or module source reads $S" sh -c '
+cd "$1" && ! { find .forgejo/workflows .github app/src/main/java module -type f ! -path "module/zygisk/*" ! -name classes.dex;
+    ls .forgejo/module-ci.conf app/build.gradle.kts build.gradle.kts settings.gradle.kts gradle.properties app/proguard-rules.pro \
+        app/src/main/cpp/CMakeLists.txt app/src/main/cpp/main.cpp; } | xargs grep -l "$2" | grep -q .' - "$ROOT" "$S"
 check "no signingConfig in app/build.gradle.kts" sh -c '! grep -q signingConfig "$1"' - "$ROOT/app/build.gradle.kts"
