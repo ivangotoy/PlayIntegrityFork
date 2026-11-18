@@ -248,7 +248,7 @@ if [ -f "$MIGRATE" ]; then
     eval TMPVAL=\$$SETTING;
     [ -z "$TMPVAL" ] && TMPVAL="$(grep_config "$SETTING" $OLDPIF)";
     case "$TMPVAL" in
-      *[!A-Za-z0-9_./:+-]*) warn "Ignoring unexpected $SETTING value in $OLDPIF"; TMPVAL="";;
+      *\;*|*\&*|*\\*|*"$NL"*|*"$CR"*) warn "Ignoring unexpected $SETTING value in $OLDPIF"; TMPVAL="";;
     esac;
     eval $SETTING=\$TMPVAL;
     [ -n "$TMPVAL" ] && sed -i "s;\($SETTING=\).;\1$TMPVAL;" custom.pif.prop;

@@ -46,13 +46,13 @@ write_fetch_stubs "$ROOT/tests/fixtures/autopif4"
 cat > "$MOD/custom.pif.prop" <<PIF
 MODEL=Pixel Old
 spoofSignature=1;touch $W/pwned-adv
-spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys
+spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys,test-keys
 verboseLogs=3
 PIF
 run_autopif
 check "advanced setting value is not executed" test ! -e "$W/pwned-adv"
 check "unsafe advanced setting value not carried" has_line "$MOD/custom.pif.prop" "spoofSignature=0"
-check "fingerprint spoofVendingFinger carried" has_line "$MOD/custom.pif.prop" "spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys"
+check "fingerprint spoofVendingFinger with comma tags carried" has_line "$MOD/custom.pif.prop" "spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys,test-keys"
 check "verboseLogs carried" has_line "$MOD/custom.pif.prop" "verboseLogs=3"
 
 # downloaded values with characters that break the config or sed sinks are refused
