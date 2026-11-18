@@ -37,9 +37,14 @@ while [ "$#" -gt 1 ]; do
         -w) wfmt="$2"; shift ;;
         -F) att="${2#attachment=@}"; shift ;;
         -d) data="$2"; shift ;;
-        -H) if [ "$2" = @- ]; then hdrs="$hdrs$(cat)
-"; else hdrs="$hdrs$2
-"; fi; shift ;;
+        -H) case "$2" in
+                @-) hdrs="$hdrs$(cat)
+" ;;
+                @*) hdrs="$hdrs$(cat "${2#@}")
+" ;;
+                *) hdrs="$hdrs$2
+" ;;
+            esac; shift ;;
     esac
     shift
 done
