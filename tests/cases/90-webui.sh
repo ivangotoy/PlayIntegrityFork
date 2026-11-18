@@ -1,50 +1,45 @@
-# WebUI import (module/webroot/index.html): a picked or downloaded custom.pif.json is converted to
-# prop text before it is written to custom.pif.prop (still base64-encoded on the way to the shell),
-# then migrated with migrate.sh -p as the WebUI does, then loaded by the native config path.
+# WebUI import (module/webroot/index.html jsonToProp): a picked or downloaded custom.pif.json is
+# converted to prop text with literal values before it is written (base64) to custom.pif.prop.
+# Values a prop line can't carry unchanged are skipped (optional keys, names reported, never values)
+# or fail the import (build fields migrate.sh needs). The converted text then goes through
+# migrate.sh in 91-webui-migrate.sh, which needs no node.
 
 if ! command -v node >/dev/null 2>&1; then
-    skip "webui json import (no node)"
+    skip "webui json import conversion (no node)"
 else
     new_root
     H="$ROOT/module/webroot/index.html"
-    sed -n '/^function jsonToProp(text) {$/,/^}$/p' "$H" > "$W/conv.js"
-    [ -s "$W/conv.js" ] || echo 'function jsonToProp(text) { return text; }' > "$W/conv.js"
+    FX="$ROOT/tests/fixtures/webui"
+    sed -n '/^function jsonToProp(/,/^}$/p' "$H" > "$W/conv.js"
     cat >> "$W/conv.js" <<'JS'
 const fs = require("fs");
-process.stdout.write(jsonToProp(fs.readFileSync(process.argv[2], "utf8")));
+const skipped = [];
+let out;
+try { out = { text: jsonToProp(fs.readFileSync(process.argv[2], "utf8"), skipped), skipped }; }
+catch (e) { out = { error: String(e.message) }; }
+fs.writeFileSync(process.argv[3], JSON.stringify(out));
+if (out.text !== undefined) process.stdout.write(out.text);
 JS
-    node "$W/conv.js" "$ROOT/tests/fixtures/webui/import.pif.json" > "$MOD/custom.pif.prop"
-    C="$MOD/custom.pif.prop"
-    check "import: JSON becomes prop lines" has_line "$C" "MANUFACTURER=Google"
-    check "import: value kept as an escaped JSON string body, # escaped" has_line "$C" 'MODEL=Pixel \"Q\" Test/AA \u00231 & co'
-    check "import: number value" has_line "$C" "DEVICE_INITIAL_SDK_INT=32"
-    check "import: newline stays escaped, no extra line" has_line "$C" 'NOTE=line1\nline2'
-    check "import: commented entry stays commented" has_line "$C" "#ro.build.version.security_patch=2025-01-05"
-    check "import: section comments kept" has_line "$C" "# Build Fields"
+    node "$W/conv.js" "$FX/clean.pif.json" "$W/clean.json" > "$W/clean.prop"
+    check "import: ordinary JSON converts exactly as before (golden from the previous converter)" cmp -s "$W/clean.prop" "$FX/clean.expected.prop"
+    check "import: ordinary JSON skips nothing" grep -qF '"skipped":[]' "$W/clean.json"
+    node "$W/conv.js" "$FX/import.pif.json" "$W/conv.json" > "$W/import.prop"
+    check "import: values written as literal text" cmp -s "$W/import.prop" "$FX/import.expected.prop"
+    check "import: value with a newline is not written" sh -c '! grep -q "^spoofSignature=1\|^NOTE=" "$1"' - "$W/import.prop"
+    check "import: value with # is not written" sh -c '! grep -q "^ro.zz.hash=" "$1"' - "$W/import.prop"
+    check "import: skipped keys reported" grep -qF '"skipped":["NOTE","ro.zz.hash","ro.zz.tab"]' "$W/conv.json"
+    check "import: skipped values not reported" sh -c '! grep -q "line1\|a#b\|spoofSignature" "$1"' - "$W/conv.json"
+
+    node "$W/conv.js" "$FX/import-bad.pif.json" "$W/bad.json" > "$W/bad.out"
+    check "import: build field with a newline fails the import" grep -q '"error":"Not imported: MODEL ' "$W/bad.json"
+    check "import: failed import produces no text" test ! -s "$W/bad.out"
+    check "import: failure message holds no value" sh -c '! grep -q spoofSignature "$1"' - "$W/bad.json"
+
     printf 'MODEL=Already Prop\n' > "$W/prop.in"
-    node "$W/conv.js" "$W/prop.in" > "$W/prop.out"
+    node "$W/conv.js" "$W/prop.in" "$W/p.json" > "$W/prop.out"
     check "import: prop text passes through unchanged" cmp -s "$W/prop.in" "$W/prop.out"
     printf '{ "MODEL": "x", \n' > "$W/broken.in"
-    node "$W/conv.js" "$W/broken.in" > "$W/broken.out"
+    node "$W/conv.js" "$W/broken.in" "$W/b.json" > "$W/broken.out"
     check "import: text that is not a JSON object passes through unchanged" cmp -s "$W/broken.in" "$W/broken.out"
-
-    (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -p "$C") > "$W/m.out" 2>&1
-    check "import + migrate -p: exits 0" test "$?" -eq 0
-    check "import + migrate -p: MODEL filled" has_line "$C" 'MODEL=Pixel \"Q\" Test/AA \u00231 & co'
-    check "import + migrate -p: FINGERPRINT filled" has_line "$C" "FINGERPRINT=google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"
-    check "import + migrate -p: derived ID" has_line "$C" "ID=ZZ1A.250101.001"
-    check "import + migrate -p: disabled security_patch stays disabled" has_line "$C" "#ro.build.version.security_patch=2025-01-05"
-    check "import + migrate -p: spoofProvider kept" has_line "$C" "spoofProvider=0"
-
-    L="$WORK/native-config/load"
-    if [ -x "$L" ]; then
-        "$L" < "$C" > "$W/native.out"
-        check "import round trip: native config gets the original MODEL" node -e '
-const fs = require("fs");
-const want = JSON.parse(fs.readFileSync(process.argv[1], "utf8").replace(/^\s*\/\/.*$/mg, "")).MODEL;
-const got = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).MODEL;
-process.exit(got === want ? 0 : 1);' "$ROOT/tests/fixtures/webui/import.pif.json" "$W/native.out"
-    else
-        skip "import round trip through the native loader (55-native-config not built)"
-    fi
+    check "webui: import handlers log skipped keys" test "$(grep -c 'Skipped entries a prop line' "$H")" -eq 2
 fi

@@ -1,0 +1,14 @@
+# Build Fields
+MANUFACTURER=Google
+MODEL=Pixel "Q" Test/AA & co
+FINGERPRINT=google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys
+SECURITY_PATCH=2025-01-05
+DEVICE_INITIAL_SDK_INT=32
+
+# System Properties
+#ro.build.version.security_patch=2025-01-05
+ro.product.first_api_level=32
+
+# Advanced Settings
+spoofProvider=0
+verboseLogs=2
