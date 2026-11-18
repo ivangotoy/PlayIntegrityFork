@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
+#include <mutex>
 
 #include "zygisk.hpp"
 #include "json/single_include/nlohmann/json.hpp"
@@ -36,9 +37,17 @@ static std::map<std::string, std::string> jsonProps;
 typedef void (*T_Callback)(void *, const char *, const char *, uint32_t);
 
 static std::map<void *, T_Callback> callbacks;
+static std::mutex callbacksMutex;
 
 static void modify_callback(void *cookie, const char *name, const char *value, uint32_t serial) {
-    if (cookie == nullptr || name == nullptr || value == nullptr || !callbacks.contains(cookie)) return;
+    if (cookie == nullptr || name == nullptr || value == nullptr) return;
+    T_Callback callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacksMutex);
+        auto it = callbacks.find(cookie);
+        if (it == callbacks.end()) return;
+        callback = it->second;
+    }
 
     const char *oldValue = value;
 
@@ -63,7 +72,7 @@ static void modify_callback(void *cookie, const char *name, const char *value, u
         LOGD("[%s]: %s -> %s", name, oldValue, value);
     }
 
-    return callbacks[cookie](cookie, name, value, serial);
+    return callback(cookie, name, value, serial);
 }
 
 static void (*o_system_property_read_callback)(const prop_info *, T_Callback, void *);
@@ -72,7 +81,10 @@ static void my_system_property_read_callback(const prop_info *pi, T_Callback cal
     if (pi == nullptr || callback == nullptr || cookie == nullptr) {
         return o_system_property_read_callback(pi, callback, cookie);
     }
-    callbacks[cookie] = callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacksMutex);
+        callbacks[cookie] = callback;
+    }
     return o_system_property_read_callback(pi, modify_callback, cookie);
 }
 
