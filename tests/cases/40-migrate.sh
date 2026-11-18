@@ -163,6 +163,25 @@ json_case splitkey "  \"MODEL\": \"x\",
   \"FOO\": \"y BRA
 ND\", // n: z; touch @W@/pwned-splitkey"
 check "json key name split across lines: not executed" test ! -e "$W/pwned-splitkey"
+# mksh (Android's /system/bin/sh) echo expands \xHH and \uHHHH; both may spell $( for the second eval
+for form in x24 u0024 U00000024; do
+    new_root
+    printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "x\\\\%s(touch %s/pwned-%s)",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' "$form" "$W" "$form" > "$MOD/custom.pif.json"
+    (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/esc-$form.out" 2>&1
+    check "json echo escape \\$form making \$: refused" has_text "$W/esc-$form.out" "Refusing to migrate"
+    if command -v mksh >/dev/null 2>&1; then
+        new_root
+        printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "x\\\\%s(touch %s/pwned-mksh-%s)",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' "$form" "$W" "$form" > "$MOD/custom.pif.json"
+        (cd "$MOD" && mksh "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/mksh-$form.out" 2>&1
+        check "json echo escape \\$form under mksh: not executed" test ! -e "$W/pwned-mksh-$form"
+    else
+        skip "json echo escape \\$form under mksh (no mksh)"
+    fi
+done
+new_root
+printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "Pixel \\u0041 \\x41",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' > "$MOD/custom.pif.json"
+(cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/esc-ok.out" 2>&1
+check "json \\u0041 / \\x41 escapes: not refused" sh -c '! grep -q Refusing "$1"' - "$W/esc-ok.out"
 if command -v dash >/dev/null 2>&1; then
     new_root
     printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "x\\\\044(touch %s/pwned-octal)",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' "$W" > "$MOD/custom.pif.json"

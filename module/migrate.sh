@@ -139,6 +139,22 @@ json_eval_unsafe() {
       }
       if (index(word, "\\\"")) print "backslash before a quote in the value read for " key;
       else if (index(word, "\\0")) print "echo octal escape in the value read for " key;
+      else if (echo_escape_unsafe(word)) print "echo escape that makes a shell character in the value read for " key;
+    }
+    # mksh echo turns \xHH, \uHHHH and \UHHHHHHHH into characters: refuse those that make $ ` " or \
+    function digit(ch, set) { return ch == "" ? -1 : index(set, tolower(ch)) - 1; }
+    function echo_escape_unsafe(t,    j, e, k, m, max, v, d) {
+      for (j = 1; j <= length(t); j++) {
+        if (substr(t, j, 1) != "\\") continue;
+        e = substr(t, j + 1, 1);
+        if (e == "x" || e == "u" || e == "U") {
+          max = e == "x" ? 2 : e == "u" ? 4 : 8; v = 0; m = 0; k = j + 2;
+          while (m < max && (d = digit(substr(t, k, 1), "0123456789abcdef")) >= 0) { v = v * 16 + d; k++; m++; }
+          if (m > 0 && (v == 36 || v == 96 || v == 34 || v == 92)) return 1;
+        }
+        j++;
+      }
+      return 0;
     }';
 }
 for JSONFILE in "$FILE" "$OUT"; do
