@@ -190,11 +190,11 @@ echo "$DEVICE_INITIAL_SDK_INT";
 [ "$DEVICE_INITIAL_SDK_INT" -gt 35 ] && warn "First API level 36 and greater may require an RKP keybox to pass";
 
 NL="
-"; CR="$(printf '\r')";
+";
 for FIELD in MODEL PRODUCT DEVICE ID INCREMENTAL SECURITY_PATCH; do
   eval VALUE=\"\$$FIELD\";
   case "$VALUE" in
-    *\$*|*\`*|*\\*|*\"*|*"$NL"*|*"$CR"*) die "Unexpected characters in $FIELD value";;
+    *\$*|*\`*|*\\*|*\"*|*"$NL"*) die "Unexpected characters in $FIELD value";;
   esac;
 done;
 case "$SECURITY_PATCH" in
@@ -248,7 +248,7 @@ if [ -f "$MIGRATE" ]; then
     eval TMPVAL=\$$SETTING;
     [ -z "$TMPVAL" ] && TMPVAL="$(grep_config "$SETTING" $OLDPIF)";
     case "$TMPVAL" in
-      *\;*|*\&*|*\\*|*"$NL"*|*"$CR"*) warn "Ignoring unexpected $SETTING value in $OLDPIF"; TMPVAL="";;
+      *\;*|*\&*|*\\*) warn "Ignoring unexpected $SETTING value in $OLDPIF"; TMPVAL="";;
     esac;
     eval $SETTING=\$TMPVAL;
     [ -n "$TMPVAL" ] && sed -i "s;\($SETTING=\).;\1$TMPVAL;" custom.pif.prop;

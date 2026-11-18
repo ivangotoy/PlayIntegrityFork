@@ -75,6 +75,15 @@ run_autopif
 check "shell syntax in downloaded MODEL: autopif4 fails" test "$?" -ne 0
 check "shell syntax in downloaded MODEL: no config installed" test ! -e "$MOD/custom.pif.prop"
 
+# a bulletin page with CRLF line endings still yields a clean SECURITY_PATCH
+new_root
+mkdir -p "$W/fix" && cp "$ROOT"/tests/fixtures/autopif4/* "$W/fix/"
+sed -i 's/$/\r/' "$W/fix/secbull.html"
+write_fetch_stubs "$W/fix"
+run_autopif
+check "CRLF bulletin: autopif4 exits 0" test "$?" -eq 0
+check "CRLF bulletin: clean SECURITY_PATCH" has_line "$MOD/custom.pif.prop" "SECURITY_PATCH=2025-01-05"
+
 # action.sh runs autopif4 with device matching unless skipmatchdevice exists
 new_root
 write_fetch_stubs "$ROOT/tests/fixtures/autopif4"
