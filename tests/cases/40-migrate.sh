@@ -159,6 +159,19 @@ check "json key name at a value end, colon in a key: not executed" test ! -e "$W
 json_case okcolon "  \"MODEL\": \"x\", // see: notes
   \"FOO\": \"time 10:30\","
 check "json ordinary colons in comments and values: not refused" sh -c '! grep -q Refusing "$1"' - "$W/okcolon.out"
+json_case splitkey "  \"MODEL\": \"x\",
+  \"FOO\": \"y BRA
+ND\", // n: z; touch @W@/pwned-splitkey"
+check "json key name split across lines: not executed" test ! -e "$W/pwned-splitkey"
+if command -v dash >/dev/null 2>&1; then
+    new_root
+    printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "x\\\\044(touch %s/pwned-octal)",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' "$W" > "$MOD/custom.pif.json"
+    check "fixture holds an escaped backslash before 044" grep -qF '"x\\044(touch' "$MOD/custom.pif.json"
+    (cd "$MOD" && dash "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/octal.out" 2>&1
+    check "json octal echo escape under dash: not executed" test ! -e "$W/pwned-octal"
+else
+    skip "json octal echo escape (no dash, whose echo expands \\0nnn)"
+fi
 json_case okcomment "  // Build Fields
   \"MODEL\": \"x\", // a note (with punctuation)
   //\"ro.build.version.security_patch\": \"2025-01-05\","

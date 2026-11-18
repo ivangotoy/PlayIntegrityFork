@@ -115,7 +115,8 @@ json_unsafe() {
   ' "$1";
 }
 # what grep_get_json would eval for a key (its own pipeline): unquoted text must stay inert, and the
-# first word must not hold a backslash before a quote (that quote breaks out of the second eval)
+# first word must not hold a backslash before a quote (that quote breaks out of the second eval) or
+# a \0 that an escape-expanding echo turns into an octal character
 json_eval_unsafe() {
   cat "$2" | tr -d '\r\n' | grep -m1 -o "$1"'".*' | cut -d: -f2- | sed 's|//|#|g' | awk -v key="$1" '
     {
@@ -137,6 +138,7 @@ json_eval_unsafe() {
         prev = c;
       }
       if (index(word, "\\\"")) print "backslash before a quote in the value read for " key;
+      else if (index(word, "\\0")) print "echo octal escape in the value read for " key;
     }';
 }
 for JSONFILE in "$FILE" "$OUT"; do
@@ -148,7 +150,7 @@ for JSONFILE in "$FILE" "$OUT"; do
           INCREMENTAL TYPE TAGS SECURITY_PATCH DEVICE_INITIAL_SDK_INT build.fingerprint build.id product.device product.name \
           security_patch VERBOSE_LOGS spoofBuild spoofProps spoofProvider spoofSignature spoofVendingSdk; do
         [ -n "$UNSAFE" ] && break;
-        grep -q "$KEY" "$JSONFILE" && UNSAFE="$(json_eval_unsafe "$KEY" "$JSONFILE")";
+        UNSAFE="$(json_eval_unsafe "$KEY" "$JSONFILE")";
       done;
       if [ -n "$UNSAFE" ]; then
         echo "! Refusing to migrate $JSONFILE: $UNSAFE; file left unchanged";
