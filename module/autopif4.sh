@@ -233,8 +233,12 @@ if [ -f "$MIGRATE" ]; then
   verboseLogs=$(grep_config "VERBOSE_LOGS" $OLDPIF);
   ADVSETTINGS="spoofBuild spoofProps spoofProvider spoofSignature spoofVendingFinger spoofVendingSdk verboseLogs";
   for SETTING in $ADVSETTINGS; do
-    eval [ -z \"\$$SETTING\" ] \&\& $SETTING=$(grep_config "$SETTING" $OLDPIF);
     eval TMPVAL=\$$SETTING;
+    [ -z "$TMPVAL" ] && TMPVAL="$(grep_config "$SETTING" $OLDPIF)";
+    case "$TMPVAL" in
+      *[!A-Za-z0-9_./:+-]*) warn "Ignoring unexpected $SETTING value in $OLDPIF"; TMPVAL="";;
+    esac;
+    eval $SETTING=\$TMPVAL;
     [ -n "$TMPVAL" ] && sed -i "s;\($SETTING=\).;\1$TMPVAL;" custom.pif.prop;
   done;
   [ "$PATCH_COMMENT" ] && sed -i 's;ro.build.version.security_patch;#ro.build.version.security_patch;' custom.pif.prop;

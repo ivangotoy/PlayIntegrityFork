@@ -40,6 +40,21 @@ check "second run exits 0" test "$?" -eq 0
 check "old config backed up" test -f "$C.bak"
 check "existing spoofSignature kept" has_line "$C" "spoofSignature=1"
 
+# existing advanced settings are carried over as data, never run (payload only touches $W)
+new_root
+write_fetch_stubs "$ROOT/tests/fixtures/autopif4"
+cat > "$MOD/custom.pif.prop" <<PIF
+MODEL=Pixel Old
+spoofSignature=1;touch $W/pwned-adv
+spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys
+verboseLogs=3
+PIF
+run_autopif
+check "advanced setting value is not executed" test ! -e "$W/pwned-adv"
+check "unsafe advanced setting value not carried" has_line "$MOD/custom.pif.prop" "spoofSignature=0"
+check "fingerprint spoofVendingFinger carried" has_line "$MOD/custom.pif.prop" "spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys"
+check "verboseLogs carried" has_line "$MOD/custom.pif.prop" "verboseLogs=3"
+
 # action.sh runs autopif4 with device matching unless skipmatchdevice exists
 new_root
 write_fetch_stubs "$ROOT/tests/fixtures/autopif4"
