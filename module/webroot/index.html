@@ -664,6 +664,7 @@ async function savePropEditor() {
   let text = $("#propEditorArea").value;
   // Ensure the text ends with a newline character
   if (text && !text.endsWith("\n")) text += "\n";
+  if (!text.trim()) { log(`Not saved: empty text would leave no settings in ${CFG} (use Remove to delete it)`, "e"); toast("Save failed"); return; }
   closePropEditor();
   busy(true);
   $("#outBox").open = true;

@@ -37,7 +37,7 @@ sb.ksu = {
     setImmediate(() => { pending--; sb[cb](r.status, r.stdout, r.stderr); });
   }
 };
-let lastLoad = null;
+let lastLoad = null, target = null;
 sb.FileReader = class { readAsText(f) { lastLoad = this.onload({ target: { result: f.text } }); } };
 sb.fetch = async () => ({ ok: true, status: 200, text: async () => fs.readFileSync(input, "utf8") });
 const idle = async () => { for (let n = 0; n < 3; n++) { await new Promise(r => setImmediate(r)); if (pending) n = -1; } };
@@ -50,8 +50,11 @@ const idle = async () => { for (let n = 0; n < 3; n++) { await new Promise(r => 
   else if (scenario === "url") { document.querySelector("#customPrintInput").value = "https://example.invalid/custom.pif.prop"; await sb.submitCustomUrl(); }
   else if (scenario === "file") { await sb.handleFileSelect({ target: { files: [{ name: "custom.pif.prop", text: fs.readFileSync(input, "utf8") }], value: "x" } }); await lastLoad; }
   else if (scenario === "delete") { const p = sb.deletePropFile(); await idle(); document.querySelector("#confirmYes").onclick(); await p; }
+  else if (scenario === "setflag") { const [k, v] = input.split("="); await sb.setFlag(k, v); }
+  else if (scenario === "setmode") { await sb.setMode(input); }
+  else if (scenario === "skip") { target = { checked: !document.querySelector(input).checked }; await document.querySelector(input).onchange({ target }); }
   await idle();
-  fs.writeFileSync(outFile, JSON.stringify({ logs: term.children.map(s => s.textContent), toasts, cmds }, null, 1));
+  fs.writeFileSync(outFile, JSON.stringify({ logs: term.children.map(s => s.textContent), toasts, cmds, checked: target ? target.checked : null }, null, 1));
 })().catch(e => { console.error(e); process.exit(1); });
 JS
     # made-up config; the new text has non-ASCII, quote, dollar, backtick and no trailing newline
@@ -96,4 +99,15 @@ JS
     node "$WJS" "$WORK/webui-write-page.js" "$W" delete /dev/null "$W/del-ok.json" 2> "$W/del-ok.err"
     check "webui delete: custom.pif.prop removed" test ! -e "$C"
     check "webui delete: removal reported as done" grep -q "✓ custom.pif.prop deleted" "$W/del-ok.json"
+
+    # Manual Edit with an empty or blank editor: refused before the backup, nothing written
+    new_root
+    C="$MOD/custom.pif.prop"
+    cp "$OLDCFG" "$C"; printf 'MODEL=Older Backup\n' > "$C.bak"; cp "$C.bak" "$W/bak.orig"
+    printf '  \n\n' > "$W/blank.txt"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" save "$W/blank.txt" "$W/blank.json" 2> "$W/blank.err"
+    check "webui save blank: harness ran" test -s "$W/blank.json"
+    check "webui save blank: custom.pif.prop unchanged" cmp -s "$OLDCFG" "$C"
+    check "webui save blank: backup not overwritten" cmp -s "$W/bak.orig" "$C.bak"
+    check "webui save blank: refused, not reported as done" sh -c 'test -s "$1" && grep -q "Save failed" "$1" && ! grep -q "✓\|killpi.sh" "$1"' - "$W/blank.json"
 fi
