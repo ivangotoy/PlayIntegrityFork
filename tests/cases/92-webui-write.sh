@@ -52,7 +52,7 @@ const idle = async () => { for (let n = 0; n < 3; n++) { await new Promise(r => 
   else if (scenario === "delete") { const p = sb.deletePropFile(); await idle(); document.querySelector("#confirmYes").onclick(); await p; }
   else if (scenario === "setflag") { const [k, v] = input.split("="); await sb.setFlag(k, v); }
   else if (scenario === "setmode") { await sb.setMode(input); }
-  else if (scenario === "skip") { target = { checked: !document.querySelector(input).checked }; await document.querySelector(input).onchange({ target }); }
+  else if (scenario === "skip") { const [sel, want] = input.split("="); target = { checked: want === "1" }; await document.querySelector(sel).onchange({ target }); }
   await idle();
   fs.writeFileSync(outFile, JSON.stringify({ logs: term.children.map(s => s.textContent), toasts, cmds, checked: target ? target.checked : null }, null, 1));
 })().catch(e => { console.error(e); process.exit(1); });
@@ -152,4 +152,21 @@ JS
     mkdir -p "$MOD/skipmatchdevice/x"
     node "$WJS" "$WORK/webui-write-page.js" "$W" setmode match "$W/mode-rmfail.json" 2> "$W/mode-rmfail.err"
     check "webui setMode match, rm fails: not logged as done" sh -c 'test -s "$1" && ! grep -q "Remove skipmatchdevice" "$1"' - "$W/mode-rmfail.json"
+
+    # skip* switches: a failed touch (stub) or rm (directory in the way) puts the switch back, logs the
+    # error and skips the reboot toast
+    for M in skipaddprop:skipAddProp skipdelprop:skipDelProp skippersistprop:skipPersistProp; do
+        N="${M%%:*}"; SEL="#${M#*:}"
+        new_root
+        mkdir -p "$W/failtouch"
+        printf '#!/bin/sh\nexit 1\n' > "$W/failtouch/touch"; chmod 755 "$W/failtouch/touch"
+        node "$WJS" "$WORK/webui-write-page.js" "$W" skip "$SEL=1" "$W/sk-ok.json" 2> "$W/sk-ok.err"
+        check "webui $N on: marker created, reboot toast" sh -c 'test -f "$1" && grep -q "Reboot required" "$2" && grep -q "\"checked\": true" "$2"' - "$MOD/$N" "$W/sk-ok.json"
+        rm -f "$MOD/$N"
+        PATH="$W/failtouch:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" skip "$SEL=1" "$W/sk-fail.json" 2> "$W/sk-fail.err"
+        check "webui $N on, touch fails: switch back off, no reboot toast" sh -c 'test -s "$1" && grep -q "\"checked\": false" "$1" && ! grep -q "Reboot required\|Create $2" "$1"' - "$W/sk-fail.json" "$N"
+        mkdir -p "$MOD/$N/x"
+        node "$WJS" "$WORK/webui-write-page.js" "$W" skip "$SEL=0" "$W/sk-rmfail.json" 2> "$W/sk-rmfail.err"
+        check "webui $N off, rm fails: switch back on, no reboot toast" sh -c 'test -s "$1" && grep -q "\"checked\": true" "$1" && ! grep -q "Reboot required\|Remove $2" "$1"' - "$W/sk-rmfail.json" "$N"
+    done
 fi

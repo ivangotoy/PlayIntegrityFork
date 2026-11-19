@@ -695,21 +695,21 @@ $("#verboseSelect").onchange = (e) => setFlag("verboseLogs", e.target.value);
 
 $("#skipAddProp").onchange = async (e) => {
   const on = e.target.checked;
-  await exec(on ? `touch ${MARK_SKIPADD}` : `rm -f ${MARK_SKIPADD}`);
+  if ((await exec(on ? `touch ${MARK_SKIPADD}` : `rm -f ${MARK_SKIPADD}`)).errno) { e.target.checked = !on; log(on ? "Creating skipaddprop failed" : "Removing skipaddprop failed", "e"); return; }
   log(on ? "Create skipaddprop" : "Remove skipaddprop", "m");
   toast("Reboot required to apply");
 };
 
 $("#skipDelProp").onchange = async (e) => {
   const on = e.target.checked;
-  await exec(on ? `touch ${MARK_SKIPDEL}` : `rm -f ${MARK_SKIPDEL}`);
+  if ((await exec(on ? `touch ${MARK_SKIPDEL}` : `rm -f ${MARK_SKIPDEL}`)).errno) { e.target.checked = !on; log(on ? "Creating skipdelprop failed" : "Removing skipdelprop failed", "e"); return; }
   log(on ? "Create skipdelprop" : "Remove skipdelprop", "m");
   toast("Reboot required to apply");
 };
 
 $("#skipPersistProp").onchange = async (e) => {
   const on = e.target.checked;
-  await exec(on ? `touch ${MARK_SKIPPERSIST}` : `rm -f ${MARK_SKIPPERSIST}`);
+  if ((await exec(on ? `touch ${MARK_SKIPPERSIST}` : `rm -f ${MARK_SKIPPERSIST}`)).errno) { e.target.checked = !on; log(on ? "Creating skippersistprop failed" : "Removing skippersistprop failed", "e"); return; }
   log(on ? "Create skippersistprop" : "Remove skippersistprop", "m");
   toast("Reboot required to apply");
 };
