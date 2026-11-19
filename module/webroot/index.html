@@ -374,15 +374,15 @@ async function killPi(){
 
 async function setMode(mode){
   try{
-    if(mode==="random"){await exec(`touch ${MARK_SKIPMATCH}`);log("Create skipmatchdevice", "m");}
-    else{await exec(`rm -f ${MARK_SKIPMATCH}`);log("Remove skipmatchdevice", "m");}
+    if(mode==="random"){if((await exec(`touch ${MARK_SKIPMATCH}`)).errno)throw new Error("Creating skipmatchdevice failed");log("Create skipmatchdevice", "m");}
+    else{if((await exec(`rm -f ${MARK_SKIPMATCH}`)).errno)throw new Error("Removing skipmatchdevice failed");log("Remove skipmatchdevice", "m");}
     await refresh();
   } catch(e){log(e.message,"e");}
 }
 
 async function setFlag(k,v){
   try{
-    await exec(`sed -i "s;^[#[:space:]]*\\(${k}=\\).*;\\1${v};" ${CFG}`);
+    if ((await exec(`sed -i "s;^[#[:space:]]*\\(${k}=\\).*;\\1${v};" ${CFG}`)).errno) throw new Error(`Setting ${k}=${v} in ${CFG} failed`);
     const status = (k === "verboseLogs") ? v : (v === "1" ? "on" : "off");
     toast(`${LABEL[k] || k} ${status}`);
     log(`Set ${k}=${v}`,"m");

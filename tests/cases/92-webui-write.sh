@@ -124,4 +124,32 @@ JS
     PATH="$W/failcp:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" save "$NEWTXT" "$W/cpfail.json" 2> "$W/cpfail.err"
     check "webui save, backup fails: custom.pif.prop unchanged" cmp -s "$OLDCFG" "$C"
     check "webui save, backup fails: aborted, not reported as done" sh -c 'test -s "$1" && grep -q "Save failed" "$1" && ! grep -q "✓\|killpi.sh\|Backed up" "$1"' - "$W/cpfail.json"
+
+    # setFlag: a failed sed (stub) or a missing custom.pif.prop is not reported as set and kills nothing
+    new_root
+    C="$MOD/custom.pif.prop"
+    printf 'MODEL=Pixel\nspoofBuild=1\n' > "$C"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofBuild=0 "$W/flag-ok.json" 2> "$W/flag-ok.err"
+    check "webui setFlag: value set" has_line "$C" "spoofBuild=0"
+    check "webui setFlag: reported and Play processes killed" sh -c 'grep -q "Spoof Build off" "$1" && grep -q "killpi.sh" "$1"' - "$W/flag-ok.json"
+    mkdir -p "$W/failsed"
+    printf '#!/bin/sh\nexit 1\n' > "$W/failsed/sed"; chmod 755 "$W/failsed/sed"
+    PATH="$W/failsed:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofBuild=1 "$W/flag-fail.json" 2> "$W/flag-fail.err"
+    check "webui setFlag, sed fails: not reported as set, nothing killed" sh -c 'test -s "$1" && ! grep -q "Spoof Build on\|Set spoofBuild\|killpi.sh" "$1"' - "$W/flag-fail.json"
+    rm -f "$C"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofBuild=1 "$W/flag-nocfg.json" 2> "$W/flag-nocfg.err"
+    check "webui setFlag without custom.pif.prop: not reported as set, nothing killed" sh -c 'test -s "$1" && ! grep -q "Spoof Build on\|Set spoofBuild\|killpi.sh" "$1"' - "$W/flag-nocfg.json"
+    check "webui setFlag without custom.pif.prop: no file created" test ! -e "$C"
+
+    # setMode: a failed touch (stub) or rm (directory in the way) is not logged as done
+    node "$WJS" "$WORK/webui-write-page.js" "$W" setmode random "$W/mode-ok.json" 2> "$W/mode-ok.err"
+    check "webui setMode random: marker created and logged" sh -c 'test -f "$1" && grep -q "Create skipmatchdevice" "$2"' - "$MOD/skipmatchdevice" "$W/mode-ok.json"
+    rm -f "$MOD/skipmatchdevice"
+    mkdir -p "$W/failtouch"
+    printf '#!/bin/sh\nexit 1\n' > "$W/failtouch/touch"; chmod 755 "$W/failtouch/touch"
+    PATH="$W/failtouch:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" setmode random "$W/mode-fail.json" 2> "$W/mode-fail.err"
+    check "webui setMode random, touch fails: not logged as done" sh -c 'test -s "$1" && ! grep -q "Create skipmatchdevice" "$1"' - "$W/mode-fail.json"
+    mkdir -p "$MOD/skipmatchdevice/x"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" setmode match "$W/mode-rmfail.json" 2> "$W/mode-rmfail.err"
+    check "webui setMode match, rm fails: not logged as done" sh -c 'test -s "$1" && ! grep -q "Remove skipmatchdevice" "$1"' - "$W/mode-rmfail.json"
 fi
