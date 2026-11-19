@@ -1,8 +1,8 @@
-# WebUI config writes (module/webroot/index.html): the real inline script runs under node
+# WebUI config writes and removal (module/webroot/index.html): the real inline script runs under node
 # with a minimal fake DOM; ksu.exec runs each command with sh in the fake root (lib.sh path rewrite).
 # A write that fails must leave the old custom.pif.prop as it was, leave no temp file, and not be
-# reported as done (no success log, no migrate.sh or killpi.sh). A write that works stores
-# the text byte for byte.
+# reported as done (no success log, no migrate.sh or killpi.sh); a failed removal must not be
+# reported as done. A write that works stores the text byte for byte.
 
 if ! command -v node >/dev/null 2>&1; then
     skip "webui config write/remove (no node)"
@@ -85,4 +85,15 @@ JS
         check "webui $SC: write reported as done" grep -q "✓" "$W/ok.json"
         check "webui $SC: write runs killpi.sh" grep -q "^killall" "$STUB_LOG"
     done
+
+    new_root
+    C="$MOD/custom.pif.prop"
+    mkdir -p "$C/x"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" delete /dev/null "$W/del-fail.json" 2> "$W/del-fail.err"
+    check "webui delete: harness ran (failing removal)" test -s "$W/del-fail.json"
+    check "webui delete: failed removal not reported as done" sh -c 'test -s "$1" && ! grep -q "✓\|Deleted custom.pif.prop" "$1"' - "$W/del-fail.json"
+    rm -rf "$C"; cp "$OLDCFG" "$C"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" delete /dev/null "$W/del-ok.json" 2> "$W/del-ok.err"
+    check "webui delete: custom.pif.prop removed" test ! -e "$C"
+    check "webui delete: removal reported as done" grep -q "✓ custom.pif.prop deleted" "$W/del-ok.json"
 fi

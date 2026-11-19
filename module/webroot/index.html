@@ -542,7 +542,7 @@ async function deletePropFile() {
   busy(true);
   $("#outBox").open = true;
   try {
-    await exec(`rm -f ${CFG}`);
+    if ((await exec(`rm -f ${CFG}`)).errno) throw new Error(`Removing ${CFG} failed`);
     log(`Removed ${CFG}`, "m");
     await killPi();
     toast("Deleted custom.pif.prop");
