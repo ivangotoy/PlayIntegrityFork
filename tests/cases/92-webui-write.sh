@@ -110,4 +110,18 @@ JS
     check "webui save blank: custom.pif.prop unchanged" cmp -s "$OLDCFG" "$C"
     check "webui save blank: backup not overwritten" cmp -s "$W/bak.orig" "$C.bak"
     check "webui save blank: refused, not reported as done" sh -c 'test -s "$1" && grep -q "Save failed" "$1" && ! grep -q "✓\|killpi.sh" "$1"' - "$W/blank.json"
+
+    # Manual Edit backup: no config -> no backup message and the save proceeds; a failed copy aborts the save
+    new_root
+    C="$MOD/custom.pif.prop"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" save "$NEWTXT" "$W/nocfg.json" 2> "$W/nocfg.err"
+    check "webui save without config: text stored" cmp -s "$NEWCFG" "$C"
+    check "webui save without config: no backup message" sh -c 'test -s "$1" && ! grep -q "Backed up" "$1"' - "$W/nocfg.json"
+    check "webui save without config: no backup file" test ! -e "$C.bak"
+    cp "$OLDCFG" "$C"
+    mkdir -p "$W/failcp"
+    printf '#!/bin/sh\nexit 1\n' > "$W/failcp/cp"; chmod 755 "$W/failcp/cp"
+    PATH="$W/failcp:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" save "$NEWTXT" "$W/cpfail.json" 2> "$W/cpfail.err"
+    check "webui save, backup fails: custom.pif.prop unchanged" cmp -s "$OLDCFG" "$C"
+    check "webui save, backup fails: aborted, not reported as done" sh -c 'test -s "$1" && grep -q "Save failed" "$1" && ! grep -q "✓\|killpi.sh\|Backed up" "$1"' - "$W/cpfail.json"
 fi

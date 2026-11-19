@@ -669,8 +669,9 @@ async function savePropEditor() {
   busy(true);
   $("#outBox").open = true;
   try {
-    await exec(`[ -f ${CFG} ] && cp -f ${CFG} ${CFG}.bak`);
-    log(`Backed up ${CFG} to ${CFG}.bak`, "m");
+    const bak = await exec(`if [ -f ${CFG} ]; then cp -f ${CFG} ${CFG}.bak && echo copied; fi`);
+    if (bak.errno) throw new Error(`Backing up ${CFG} to ${CFG}.bak failed`);
+    if (bak.stdout.trim() === "copied") log(`Backed up ${CFG} to ${CFG}.bak`, "m");
     const b64 = btoa(unescape(encodeURIComponent(text)));
     await writeConfig(b64);
     log(`Saved manual edits to ${CFG}`, "m");
