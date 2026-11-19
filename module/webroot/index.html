@@ -387,7 +387,7 @@ async function setFlag(k,v){
     toast(`${LABEL[k] || k} ${status}`);
     log(`Set ${k}=${v}`,"m");
     await killPi();
-  } catch(e){log(e.message,"e");}
+  } catch(e){log(e.message,"e");await refresh().catch(()=>{});}
 }
 
 // Imported custom.pif.json -> custom.pif.prop text; anything that is not a JSON object is returned as is.

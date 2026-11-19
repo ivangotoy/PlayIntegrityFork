@@ -50,11 +50,11 @@ const idle = async () => { for (let n = 0; n < 3; n++) { await new Promise(r => 
   else if (scenario === "url") { document.querySelector("#customPrintInput").value = "https://example.invalid/custom.pif.prop"; await sb.submitCustomUrl(); }
   else if (scenario === "file") { await sb.handleFileSelect({ target: { files: [{ name: "custom.pif.prop", text: fs.readFileSync(input, "utf8") }], value: "x" } }); await lastLoad; }
   else if (scenario === "delete") { const p = sb.deletePropFile(); await idle(); document.querySelector("#confirmYes").onclick(); await p; }
-  else if (scenario === "setflag") { const [k, v] = input.split("="); await sb.setFlag(k, v); }
+  else if (scenario === "setflag") { const [k, v] = input.split("="); if (k === "verboseLogs") document.querySelector("#verboseSelect").value = v; await sb.setFlag(k, v); }
   else if (scenario === "setmode") { await sb.setMode(input); }
   else if (scenario === "skip") { const [sel, want] = input.split("="); target = { checked: want === "1" }; await document.querySelector(sel).onchange({ target }); }
   await idle();
-  fs.writeFileSync(outFile, JSON.stringify({ logs: term.children.map(s => s.textContent), toasts, cmds, checked: target ? target.checked : null }, null, 1));
+  fs.writeFileSync(outFile, JSON.stringify({ logs: term.children.map(s => s.textContent), toasts, cmds, checked: target ? target.checked : null, verbose: els["#verboseSelect"] ? els["#verboseSelect"].value : null }, null, 1));
 })().catch(e => { console.error(e); process.exit(1); });
 JS
     # made-up config; the new text has non-ASCII, quote, dollar, backtick and no trailing newline
@@ -169,4 +169,16 @@ JS
         node "$WJS" "$WORK/webui-write-page.js" "$W" skip "$SEL=0" "$W/sk-rmfail.json" 2> "$W/sk-rmfail.err"
         check "webui $N off, rm fails: switch back on, no reboot toast" sh -c 'test -s "$1" && grep -q "\"checked\": true" "$1" && ! grep -q "Reboot required\|Remove $2" "$1"' - "$W/sk-rmfail.json" "$N"
     done
+    # setFlag failure redraws the controls from custom.pif.prop: a switch or select the user moved goes
+    # back to the stored value (verboseLogs select; the flag switches are rebuilt by the same refresh)
+    new_root
+    C="$MOD/custom.pif.prop"
+    printf 'MODEL=Pixel\nverboseLogs=3\n' > "$C"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" setflag verboseLogs=1 "$W/vl-ok.json" 2> "$W/vl-ok.err"
+    check "webui setFlag verboseLogs: value stored and shown" sh -c 'grep -qx "verboseLogs=1" "$1" && grep -q "\"verbose\": \"1\"" "$2"' - "$C" "$W/vl-ok.json"
+    printf 'MODEL=Pixel\nverboseLogs=3\n' > "$C"
+    mkdir -p "$W/failsed"
+    printf '#!/bin/sh\nexit 1\n' > "$W/failsed/sed"; chmod 755 "$W/failsed/sed"
+    PATH="$W/failsed:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" setflag verboseLogs=1 "$W/vl-fail.json" 2> "$W/vl-fail.err"
+    check "webui setFlag verboseLogs, sed fails: select shows the stored value again" grep -q '"verbose": "3"' "$W/vl-fail.json"
 fi
