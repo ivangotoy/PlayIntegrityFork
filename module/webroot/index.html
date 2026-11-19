@@ -449,6 +449,13 @@ function jsonToProp(text, skipped = []) {
   return finish(lines.join("\n").replace(/^\n+|\n+$/g, "") + "\n");
 }
 
+// Write base64 text to custom.pif.prop through a temp file: a failed decode or write leaves the
+// old file as it was and throws, so the caller does not report it as done.
+async function writeConfig(b64) {
+  const r = await exec(`echo "${b64}" | base64 -d > ${CFG}.tmp && mv -f ${CFG}.tmp ${CFG} || { rm -f ${CFG}.tmp; false; }`);
+  if (r.errno) throw new Error(`Writing ${CFG} failed${r.stderr.trim() ? ": " + r.stderr.trim() : ""}`);
+}
+
 async function handleFileSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -465,7 +472,7 @@ async function handleFileSelect(event) {
       if (skipped.length) log(`Skipped entries a prop line can't hold: ${skipped.join(", ")}`, "w");
       // Base64 encode to safely pass file contents through the root shell
       const b64 = btoa(unescape(encodeURIComponent(text)));
-      await exec(`echo "${b64}" | base64 -d > ${CFG}`);
+      await writeConfig(b64);
       log(`Copied ${file.name} to ${CFG}`, "m");
       await migrateCfg($("#migrateForce").checked?"-p":"");
       await killPi();
@@ -501,7 +508,7 @@ async function submitCustomUrl() {
     if (skipped.length) log(`Skipped entries a prop line can't hold: ${skipped.join(", ")}`, "w");
     // Base64 encode to safely pass file contents through the root shell
     const b64 = btoa(unescape(encodeURIComponent(text)));
-    await exec(`echo "${b64}" | base64 -d > ${CFG}`);
+    await writeConfig(b64);
     log(`Downloaded ${url} to ${CFG}`, "m");
     await migrateCfg($("#migrateForce").checked?"-p":"");
     await killPi();
@@ -664,7 +671,7 @@ async function savePropEditor() {
     await exec(`[ -f ${CFG} ] && cp -f ${CFG} ${CFG}.bak`);
     log(`Backed up ${CFG} to ${CFG}.bak`, "m");
     const b64 = btoa(unescape(encodeURIComponent(text)));
-    await exec(`echo "${b64}" | base64 -d > ${CFG}`);
+    await writeConfig(b64);
     log(`Saved manual edits to ${CFG}`, "m");
     await killPi();
     toast("Saved custom.pif.prop");
