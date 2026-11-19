@@ -382,7 +382,7 @@ async function setMode(mode){
 
 async function setFlag(k,v){
   try{
-    if ((await exec(`sed -i "s;^[#[:space:]]*\\(${k}=\\).*;\\1${v};" ${CFG}`)).errno) throw new Error(`Setting ${k}=${v} in ${CFG} failed`);
+    if ((await exec(`grep -q "^[#[:space:]]*${k}=" ${CFG} && sed -i "s;^[#[:space:]]*\\(${k}=\\).*;\\1${v};" ${CFG}`)).errno) throw new Error(`Setting ${k}=${v} in ${CFG} failed`);
     const status = (k === "verboseLogs") ? v : (v === "1" ? "on" : "off");
     toast(`${LABEL[k] || k} ${status}`);
     log(`Set ${k}=${v}`,"m");

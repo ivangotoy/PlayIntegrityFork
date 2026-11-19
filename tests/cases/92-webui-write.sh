@@ -181,4 +181,15 @@ JS
     printf '#!/bin/sh\nexit 1\n' > "$W/failsed/sed"; chmod 755 "$W/failsed/sed"
     PATH="$W/failsed:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" setflag verboseLogs=1 "$W/vl-fail.json" 2> "$W/vl-fail.err"
     check "webui setFlag verboseLogs, sed fails: select shows the stored value again" grep -q '"verbose": "3"' "$W/vl-fail.json"
+    # setFlag on a flag whose line is not in custom.pif.prop: sed changes nothing and exits 0, so the
+    # change must be reported as failed (not as set, no kill); a commented line is still set
+    new_root
+    C="$MOD/custom.pif.prop"
+    printf 'MODEL=Pixel\nspoofBuild=1\n' > "$C"; cp "$C" "$W/noline.orig"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofProvider=1 "$W/flag-noline.json" 2> "$W/flag-noline.err"
+    check "webui setFlag, flag line absent: not reported as set, nothing killed" sh -c 'test -s "$1" && ! grep -q "Spoof Provider on\|Set spoofProvider\|killpi.sh" "$1"' - "$W/flag-noline.json"
+    check "webui setFlag, flag line absent: config unchanged" cmp -s "$W/noline.orig" "$C"
+    printf 'MODEL=Pixel\n# spoofProvider=0\n' > "$C"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofProvider=1 "$W/flag-commented.json" 2> "$W/flag-commented.err"
+    check "webui setFlag, commented flag line: set and reported" sh -c 'grep -qx "spoofProvider=1" "$1" && grep -q "Spoof Provider on" "$2"' - "$C" "$W/flag-commented.json"
 fi
