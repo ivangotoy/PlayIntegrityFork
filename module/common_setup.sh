@@ -12,6 +12,7 @@ LIST=$MODPATH/app_replace_list.txt
 [ -f "$MODPATH/custom.app_replace_list.txt" ] && LIST=$MODPATH/custom.app_replace_list.txt
 for APP in $(grep -v '^#' $LIST); do
     if [ -e "$APP" ]; then
+        PREFIX=; APK=; HIDECFG=
         case $APP in
             /system/*) ;;
             *) PREFIX=/system;;
