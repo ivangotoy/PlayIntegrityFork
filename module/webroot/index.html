@@ -576,7 +576,8 @@ async function savePifLog() {
   toast("Saving PIF Logcat to /sdcard…");
   log("\n# logcat -d | grep 'PIF/'","g");
   try{
-    await exec(`logcat -d | grep 'PIF/' >/sdcard/pif.log`);
+    const r=await exec(`{ logcat -d | grep 'PIF/'; [ $? -le 1 ]; } >/sdcard/pif.log`);
+    if(r.errno)throw new Error(`Saving /sdcard/pif.log failed${r.stderr.trim()?": "+r.stderr.trim():""}`);
     log("✓ Logcat saved to /sdcard/pif.log","g");
   } catch(e){log(e.message,"e");}
   busy(false);

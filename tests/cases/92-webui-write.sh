@@ -31,7 +31,7 @@ sb.ksu = {
   toast: m => toasts.push(m),
   exec(cmd, opts, cb) {
     pending++;
-    const c = cmd.split("/data/adb").join(root + "/data/adb");
+    const c = cmd.split("/data/adb").join(root + "/data/adb").split("/sdcard/").join(root + "/sdcard/");
     cmds.push(c);
     const r = cp.spawnSync("sh", ["-c", c], { encoding: "utf8" });
     setImmediate(() => { pending--; sb[cb](r.status, r.stdout, r.stderr); });
@@ -51,6 +51,7 @@ const idle = async () => { for (let n = 0; n < 3; n++) { await new Promise(r => 
   if (scenario === "save") { document.querySelector("#propEditorArea").value = fs.readFileSync(input, "utf8"); await sb.savePropEditor(); }
   else if (scenario === "url") { document.querySelector("#customPrintInput").value = "https://example.invalid/custom.pif.prop"; await sb.submitCustomUrl(); }
   else if (scenario === "fileerr") { target = { files: [{ name: "custom.pif.prop", fail: true }], value: "x" }; await sb.handleFileSelect({ target }); await lastLoad; }
+  else if (scenario === "piflog") { await sb.savePifLog(); }
   else if (scenario === "file") { await sb.handleFileSelect({ target: { files: [{ name: "custom.pif.prop", text: fs.readFileSync(input, "utf8") }], value: "x" } }); await lastLoad; }
   else if (scenario === "delete") { const p = sb.deletePropFile(); await idle(); document.querySelector("#confirmYes").onclick(); await p; }
   else if (scenario === "setflag") { const [k, v] = input.split("="); if (k === "verboseLogs") document.querySelector("#verboseSelect").value = v; await sb.setFlag(k, v); }
@@ -206,4 +207,19 @@ JS
     check "webui file read fails: error logged, not reported as applied" sh -c 'grep -q "read failed" "$1" && ! grep -q "✓\|Copied \|killpi.sh" "$1"' - "$W/fileerr.json"
     check "webui file read fails: picker reset" grep -q '"picker": ""' "$W/fileerr.json"
     check "webui file read fails: custom.pif.prop unchanged" cmp -s "$OLDCFG" "$C"
+    # Save PIF Logcat: PIF lines or none (grep exits 1) are saved and reported; a log file that
+    # cannot be written (no /sdcard directory) is reported as failed
+    new_root
+    printf '#!/bin/sh\n[ "$1" = -d ] && cat "%s"\n' "$W/logcat.txt" > "$W/bin/logcat"; chmod 755 "$W/bin/logcat"
+    printf 'I zz: other\nD PIF/Native: line one\nD PIF/Java:DG: line two\n' > "$W/logcat.txt"
+    mkdir -p "$W/sdcard"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" piflog /dev/null "$W/log-ok.json" 2> "$W/log-ok.err"
+    check "webui save logcat: PIF lines saved" sh -c 'test "$(grep -c PIF/ "$1")" -eq 2 && ! grep -q other "$1"' - "$W/sdcard/pif.log"
+    check "webui save logcat: reported as saved" grep -q "✓ Logcat saved" "$W/log-ok.json"
+    printf 'I zz: other\n' > "$W/logcat.txt"; rm -f "$W/sdcard/pif.log"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" piflog /dev/null "$W/log-none.json" 2> "$W/log-none.err"
+    check "webui save logcat, no PIF lines: empty log saved and reported" sh -c 'test -f "$1" && test ! -s "$1" && grep -q "✓ Logcat saved" "$2"' - "$W/sdcard/pif.log" "$W/log-none.json"
+    rm -rf "$W/sdcard"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" piflog /dev/null "$W/log-fail.json" 2> "$W/log-fail.err"
+    check "webui save logcat, log not writable: not reported as saved" sh -c 'test -s "$1" && ! grep -q "✓" "$1" && grep -q "pif.log failed" "$1"' - "$W/log-fail.json"
 fi
