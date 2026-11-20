@@ -38,7 +38,9 @@ sb.ksu = {
   }
 };
 let lastLoad = null, target = null;
-sb.FileReader = class { readAsText(f) { lastLoad = this.onload({ target: { result: f.text } }); } };
+sb.FileReader = class { readAsText(f) {
+  if (f.fail) { this.error = new Error("read failed"); lastLoad = this.onerror ? this.onerror({ target: this }) : null; }
+  else lastLoad = this.onload({ target: { result: f.text } }); } };
 sb.fetch = async () => ({ ok: true, status: 200, text: async () => fs.readFileSync(input, "utf8") });
 const idle = async () => { for (let n = 0; n < 3; n++) { await new Promise(r => setImmediate(r)); if (pending) n = -1; } };
 (async () => {
@@ -48,13 +50,14 @@ const idle = async () => { for (let n = 0; n < 3; n++) { await new Promise(r => 
   const term = els["#term"]; term.children.length = 0; cmds.length = 0; toasts.length = 0;
   if (scenario === "save") { document.querySelector("#propEditorArea").value = fs.readFileSync(input, "utf8"); await sb.savePropEditor(); }
   else if (scenario === "url") { document.querySelector("#customPrintInput").value = "https://example.invalid/custom.pif.prop"; await sb.submitCustomUrl(); }
+  else if (scenario === "fileerr") { target = { files: [{ name: "custom.pif.prop", fail: true }], value: "x" }; await sb.handleFileSelect({ target }); await lastLoad; }
   else if (scenario === "file") { await sb.handleFileSelect({ target: { files: [{ name: "custom.pif.prop", text: fs.readFileSync(input, "utf8") }], value: "x" } }); await lastLoad; }
   else if (scenario === "delete") { const p = sb.deletePropFile(); await idle(); document.querySelector("#confirmYes").onclick(); await p; }
   else if (scenario === "setflag") { const [k, v] = input.split("="); if (k === "verboseLogs") document.querySelector("#verboseSelect").value = v; await sb.setFlag(k, v); }
   else if (scenario === "setmode") { await sb.setMode(input); }
   else if (scenario === "skip") { const [sel, want] = input.split("="); target = { checked: want === "1" }; await document.querySelector(sel).onchange({ target }); }
   await idle();
-  fs.writeFileSync(outFile, JSON.stringify({ logs: term.children.map(s => s.textContent), toasts, cmds, checked: target ? target.checked : null, verbose: els["#verboseSelect"] ? els["#verboseSelect"].value : null }, null, 1));
+  fs.writeFileSync(outFile, JSON.stringify({ logs: term.children.map(s => s.textContent), toasts, cmds, checked: target ? target.checked : null, picker: target ? target.value : null, busy: vm.runInContext("typeof isBusy === 'undefined' ? null : isBusy", sb), verbose: els["#verboseSelect"] ? els["#verboseSelect"].value : null }, null, 1));
 })().catch(e => { console.error(e); process.exit(1); });
 JS
     # made-up config; the new text has non-ASCII, quote, dollar, backtick and no trailing newline
@@ -192,4 +195,15 @@ JS
     printf 'MODEL=Pixel\n# spoofProvider=0\n' > "$C"
     node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofProvider=1 "$W/flag-commented.json" 2> "$W/flag-commented.err"
     check "webui setFlag, commented flag line: set and reported" sh -c 'grep -qx "spoofProvider=1" "$1" && grep -q "Spoof Provider on" "$2"' - "$C" "$W/flag-commented.json"
+    # a local file that cannot be read: the error is logged, the busy lock is released (it disables every
+    # control but Refresh), the picker is reset and nothing is written or reported as applied
+    new_root
+    C="$MOD/custom.pif.prop"
+    cp "$OLDCFG" "$C"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" fileerr /dev/null "$W/fileerr.json" 2> "$W/fileerr.err"
+    check "webui file read fails: harness ran" test -s "$W/fileerr.json"
+    check "webui file read fails: busy lock released" grep -q '"busy": false' "$W/fileerr.json"
+    check "webui file read fails: error logged, not reported as applied" sh -c 'grep -q "read failed" "$1" && ! grep -q "✓\|Copied \|killpi.sh" "$1"' - "$W/fileerr.json"
+    check "webui file read fails: picker reset" grep -q '"picker": ""' "$W/fileerr.json"
+    check "webui file read fails: custom.pif.prop unchanged" cmp -s "$OLDCFG" "$C"
 fi

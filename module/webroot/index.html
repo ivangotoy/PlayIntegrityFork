@@ -490,6 +490,12 @@ async function handleFileSelect(event) {
     busy(false);
     event.target.value = ""; // Reset picker
   };
+  reader.onerror = async function() {
+    log(`Reading ${file.name} failed${reader.error ? ": " + reader.error.message : ""}`, "e");
+    await refresh();
+    busy(false);
+    event.target.value = "";
+  };
   reader.readAsText(file);
 }
 
