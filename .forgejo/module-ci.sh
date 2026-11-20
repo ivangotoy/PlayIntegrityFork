@@ -175,6 +175,19 @@ case "$BUILT_VC" in ''|*[!0-9]*) die "built versionCode '$BUILT_VC' is not a num
 VERSION="$(printf '%s' "$BUILT_VERSION" | sed -E 's/-(fork|ci)[0-9]+$//')-ci$RUN_NUMBER"
 VC=$((BUILT_VC + VERSION_CODE_OFFSET))
 [ "$VC" -ge "$VERSION_CODE_FLOOR" ] || die "versionCode $VC is below the floor $VERSION_CODE_FLOOR"
+# root managers offer only a versionCode above the published update.json's (as of the dispatched
+# commit; no file = nothing published): raise VC above it, stop on an unreadable one
+LAST_VC=0
+if git cat-file -e "$BASE_SHA:$UPDATE_JSON_PATH" 2>/dev/null; then
+    LAST_VC="$(git show "$BASE_SHA:$UPDATE_JSON_PATH" | python3 -I -c 'import json,sys
+v=json.load(sys.stdin)["versionCode"]
+if type(v) is not int or v < 0: sys.exit("not a non-negative integer")
+print(v)')" || die "$UPDATE_JSON_PATH at $BASE_SHA has no readable integer versionCode"
+fi
+if [ "$VC" -le "$LAST_VC" ]; then
+    log "versionCode $VC is not above the published $LAST_VC: using $((LAST_VC + 1))"
+    VC=$((LAST_VC + 1))
+fi
 TAG="$(printf '%s' "$VERSION" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+/-/g; s/^-//; s/-$//')"
 case "$TAG" in v*) ;; *) TAG="v$TAG" ;; esac
 ZIP_NAME="$ZIP_PREFIX-$TAG.zip"

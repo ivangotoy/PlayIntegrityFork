@@ -7,13 +7,17 @@ for c in bash python3 git zip unzip sha256sum; do command -v "$c" >/dev/null 2>&
 if [ -n "$need" ]; then
     skip "module-ci.sh release (missing:$need)"
 else
+    # rel_scenario <update.json at BASE, "" = none>: fresh fake forge, seed and build output, then one
+    # release run; the module builds versionCode $HBUILT and the conf adds $HOFF
+    HBUILT=100; HOFF=0
+    rel_scenario() {
     new_root
     F="$W/forge"; R=owner/zzmodule; TOKEN=fake-token-0123456789
     mkdir -p "$F/owner" "$W/state" "$W/run" "$W/seed/.forgejo"
     git init -q --bare "$F/$R.git"
     git --git-dir="$F/$R.git" symbolic-ref HEAD refs/heads/main
-    printf 'ZIP_PREFIX=ZzModule\nVERSION_CODE_FLOOR=100\n' > "$W/seed/.forgejo/module-ci.conf"
-    echo '{}' > "$W/seed/.forgejo/update.json"
+    printf 'ZIP_PREFIX=ZzModule\nVERSION_CODE_FLOOR=100\nVERSION_CODE_OFFSET=%s\n' "$HOFF" > "$W/seed/.forgejo/module-ci.conf"
+    [ -z "$1" ] || printf '%s\n' "$1" > "$W/seed/.forgejo/update.json"
     (cd "$W/seed" && git init -q && git checkout -q -b main && git add -A \
         && git -c user.name=t -c user.email=t@example.invalid commit -q -m seed \
         && git push -q "$F/$R.git" main) > "$W/seed.log" 2>&1
@@ -21,7 +25,7 @@ else
     OUTD="$W/build/.ci-out"; mkdir -p "$OUTD" "$W/mod"
     printf '%s\n\n' "$BASE" > "$OUTD/src"
     echo "" > "$OUTD/desc"
-    printf 'id=zzmodule\nversion=v1\nversionCode=100\nupdateJson=https://example.invalid/old.json\n' > "$W/mod/module.prop"
+    printf 'id=zzmodule\nversion=v1\nversionCode=%s\nupdateJson=https://example.invalid/old.json\n' "$HBUILT" > "$W/mod/module.prop"
     echo 'echo hi' > "$W/mod/service.sh"
     (cd "$W/mod" && zip -qr9 "$OUTD/module.zip" .)
     REALGIT="$(command -v git)"
@@ -61,7 +65,7 @@ case "$m $p" in
         if [ -n "$wfmt" ]; then [ -n "$out" ] && : > "$out"; printf 404; exit 0; fi
         [ -f "$S/published" ] || fail "tag before publish"
         printf '{"commit": {"sha": "%s"}}' "$(cat "$S/published")" | emit ;;
-    "POST /api/v1/repos/$R/releases") printf '{"id": 7}' | emit ;;
+    "POST /api/v1/repos/$R/releases") printf '%s' "$data" > "$S/release-req"; printf '{"id": 7}' | emit ;;
     "POST /api/v1/repos/$R/releases/7/assets?name="*) cp "$att" "$S/asset.zip"; printf '{"id": 9}' | emit ;;
     "GET /api/v1/repos/$R/releases/7/assets/9") printf '{"browser_download_url": "file://%s/attachments/9"}' "$F" | emit ;;
     "GET /attachments/9") cat "$S/asset.zip" | emit ;;
@@ -78,6 +82,8 @@ STUB
     (cd "$W/run" && SERVER_URL="file://$F" REPOSITORY="$R" BASE_SHA="$BASE" RELEASE_TOKEN="$TOKEN" RUN_NUMBER=5 \
         bash "$ROOT/.forgejo/module-ci.sh" release "$W/build") > "$W/release.out" 2>&1
     rc=$?
+    }
+    rel_scenario ""
     check "module-ci.sh release exits 0 (offline forge)" test "$rc" -eq 0
     [ "$rc" -eq 0 ] || sed 's/^/    | /' "$W/release.out" | tail -n 15
     check "release published at the dispatched commit" test "$(cat "$W/state/published" 2>/dev/null)" = "$BASE"
@@ -85,6 +91,23 @@ STUB
     check "uploaded zip points updateJson at the forge" sh -c 'unzip -p "$1" module.prop | grep -qx "updateJson=$2"' - "$W/state/asset.zip" "file://$F/$R/raw/branch/main/.forgejo/update.json"
     check "API calls were made" grep -q '^curl .*/api/v1/' "$W/argv.log"
     check "token never appears in curl/git argv" sh -c '! grep -qF "$1" "$2"' - "$TOKEN" "$W/argv.log"
+
+    # the published update.json (at the dispatched commit) already holds the code this build would get:
+    # the release goes one above it, in the zip, the release text and update.json
+    rel_scenario "{\"versionCode\": $((HBUILT + HOFF))}"
+    NEXT=$((HBUILT + HOFF + 1))
+    check "versionCode equal to the published one: release exits 0" test "$rc" -eq 0
+    [ "$rc" -eq 0 ] || sed 's/^/    | /' "$W/release.out" | tail -n 15
+    check "versionCode equal to the published one: zip module.prop gets $NEXT" sh -c 'unzip -p "$1" module.prop | grep -qx "versionCode=$2"' - "$W/state/asset.zip" "$NEXT"
+    check "versionCode equal to the published one: release text says $NEXT" grep -q "versionCode $NEXT" "$W/state/release-req"
+    check "versionCode equal to the published one: update.json gets $NEXT" sh -c 'git --git-dir="$1" show main:.forgejo/update.json | grep -q "\"versionCode\": $2,"' - "$F/$R.git" "$NEXT"
+    # an update.json whose versionCode is not an integer stops the release before anything is published
+    for bad in '{"versionCode": "100"}' '{}' 'not json'; do
+        rel_scenario "$bad"
+        check "published update.json $bad: release fails" test "$rc" -ne 0
+        check "published update.json $bad: no forge request, no push" sh -c '! grep -q "^curl " "$1" && test "$(git --git-dir="$2" rev-parse main)" = "$3"' - "$W/argv.log" "$F/$R.git" "$BASE"
+        check "published update.json $bad: nothing uploaded or published" test ! -e "$W/state/asset.zip" -a ! -e "$W/state/published"
+    done
 fi
 
 # release cleanup deletes only a release the forge still reports as a draft. The publish PATCH may be
