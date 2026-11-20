@@ -121,19 +121,23 @@ else
     {
         echo 'set -euo pipefail'
         echo 'API=https://forge.invalid/api/v1/repos/example/mod RELEASE_ID=7 PUBLISHED=0 SRC_SHA=0123456789abcdef0123456789abcdef01234567'
+        echo 'DRAFT_REQUESTED=0 TAG=v9.9-ci7 REQ={}'
         echo 'AUTH_DIR=$(mktemp -d) AUTH_H=$AUTH_DIR/header; : > "$AUTH_H"'
         sed -n '/^log() {/p; /^die() {/p; /^jget() {/,/^print(d)/p; /^api() {/,/^}/p; /^cleanup() {/,/^}/p' "$ROOT/.forgejo/module-ci.sh"
         echo 'trap cleanup EXIT'
-        echo 'if [ "$1" = publish ]; then'
+        echo 'if [ "$1" = create ]; then RELEASE_ID=""'
+        sed -n '/^DRAFT_REQUESTED=1$/,/^RELEASE_ID="\$(api POST \/releases /p' "$ROOT/.forgejo/module-ci.sh"
+        echo 'elif [ "$1" = publish ]; then'
         sed -n '/^REQ="\$(python3 -I -c .import json,sys;print(json.dumps({"draft":False/,/^PUBLISHED=1$/p' "$ROOT/.forgejo/module-ci.sh"
         echo 'else die "upload failed"; fi'
     } > "$RW/rel.sh"
-    # fake curl: logs "METHOD URL"; PATCH exits $PATCH_RC; GET of the release answers draft=$DRAFT or fails (DRAFT=fail)
+    # fake curl: logs "METHOD URL"; POST exits $POST_RC, PATCH $PATCH_RC; GET of the release answers draft=$DRAFT or fails (DRAFT=fail)
     cat > "$RW/bin/curl" <<EOF
 #!/bin/sh
 m=GET; p=; for a in "\$@"; do [ "\$p" = -X ] && m=\$a; p=\$a; u=\$a; done
 echo "\$m \$u" >> "$RW/calls"
 case "\$m" in
+  POST) exit "\${POST_RC:-0}" ;;
   PATCH) exit "\${PATCH_RC:-0}" ;;
   GET) [ "\$DRAFT" = fail ] && exit 22; printf '{"id": 7, "draft": %s}' "\$DRAFT" ;;
 esac
@@ -157,6 +161,12 @@ EOF
     rel publish DRAFT=false; rc=$?
     check "release cleanup: good publish: exit 0" test "$rc" -eq 0
     check "release cleanup: good publish: no DELETE" sh -c '! grep -q "^DELETE " "$1"' - "$RW/calls"
+    rel create POST_RC=28 DRAFT=true; rc=$?
+    check "release cleanup: failed or unanswered draft request: job fails" test "$rc" -ne 0
+    check "release cleanup: failed or unanswered draft request: POST sent, no DELETE" \
+        sh -c 'grep -q "^POST " "$1" && ! grep -q "^DELETE " "$1"' - "$RW/calls"
+    check "release cleanup: failed or unanswered draft request: tag logged for a check by hand" \
+        sh -c 'grep -q "the draft request for v9.9-ci7 failed or its reply was lost" "$1" && ! grep -q "unbound variable" "$1"' - "$RW/err"
 fi
 
 # build step (module-ci.sh build): whatever the build user started is killed after the build,
