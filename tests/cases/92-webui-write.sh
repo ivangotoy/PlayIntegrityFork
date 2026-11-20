@@ -222,4 +222,10 @@ JS
     rm -rf "$W/sdcard"
     node "$WJS" "$WORK/webui-write-page.js" "$W" piflog /dev/null "$W/log-fail.json" 2> "$W/log-fail.err"
     check "webui save logcat, log not writable: not reported as saved" sh -c 'test -s "$1" && ! grep -q "✓" "$1" && grep -q "pif.log failed" "$1"' - "$W/log-fail.json"
+    # a grep that fails (exit 2) is an error, not "no PIF lines" (exit 1)
+    mkdir -p "$W/sdcard"
+    printf '#!/bin/sh\necho "grep: read error" >&2\nexit 2\n' > "$W/bin/grep"; chmod 755 "$W/bin/grep"
+    node "$WJS" "$WORK/webui-write-page.js" "$W" piflog /dev/null "$W/log-grep2.json" 2> "$W/log-grep2.err"
+    rm -f "$W/bin/grep"
+    check "webui save logcat, grep error: not reported as saved" sh -c 'test -s "$1" && ! grep -q "✓" "$1" && grep -q "pif.log failed" "$1"' - "$W/log-grep2.json"
 fi
