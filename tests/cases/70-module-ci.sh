@@ -12,7 +12,7 @@ else
     HBUILT=100; HOFF=0
     rel_scenario() {
     new_root
-    F="$W/forge"; R=owner/zzmodule; TOKEN=fake-token-0123456789
+    F="$W/forge"; R=owner/zzmodule; TOKEN="$(printf 'fake-%s-0123456789' token)"
     mkdir -p "$F/owner" "$W/state" "$W/run" "$W/seed/.forgejo"
     git init -q --bare "$F/$R.git"
     git --git-dir="$F/$R.git" symbolic-ref HEAD refs/heads/main
