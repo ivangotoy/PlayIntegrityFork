@@ -43,7 +43,7 @@ for FILE in custom.app_replace_list.txt custom.pif.json custom.pif.prop skipaddp
 done
 
 # Support upgrading from previous module ID
-if [ -f "/data/adb/modules/playintegrityfix/migrate.sh" ]; then
+if [ -f "/data/adb/modules/playintegrityfix/migrate.sh" -o -f "/data/adb/modules/playintegrityfix/scripts-only-mode" ]; then
     ui_print "! Migrating configuration to new playintegrityfork module ID"
     if [ -d /data/adb/modules/playintegrityfix/system ]; then
         ui_print "- Restoring disabled ROM apps configuration"
@@ -56,6 +56,7 @@ if [ -f "/data/adb/modules/playintegrityfix/migrate.sh" ]; then
         fi
     done
 fi
+rm -f /data/adb/modules/playintegrityfix/scripts-only-mode
 
 # Warn if potentially conflicting modules are installed
 if [ -d /data/adb/modules/MagiskHidePropsConf ]; then

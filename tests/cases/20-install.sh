@@ -209,3 +209,37 @@ for trig in old new; do
     check "$S: old module marked for removal" test -f "$OLD/remove"
     check "$S: skipdelprop carried as in a same-ID update" test -f "$NEW/skipdelprop"
 done
+
+# upgrade of an old ID install that is in scripts-only mode (no migrate.sh there): its skip markers are
+# carried like in a same-ID update, and the scripts-only choice moves to the new module
+new_root
+OLD="$W/data/adb/modules/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
+mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
+mkdir -p "$OLD" && for f in module.prop common_func.sh post-fs-data.sh service.sh; do cp "$MOD/$f" "$OLD/"; done
+rm -rf "$MOD"
+touch "$OLD/scripts-only-mode" "$OLD/skipdelprop" "$OLD/skipaddprop"
+setprop sys.boot_completed 1
+install_module "$NEW"
+S="old ID scripts-only install"
+check "$S: still scripts-only" test -f "$NEW/scripts-only-mode"
+check "$S: skipdelprop carried" test -f "$NEW/skipdelprop"
+check "$S: skipaddprop carried" test -f "$NEW/skipaddprop"
+check "$S: old module marked for removal" test -f "$OLD/remove"
+
+# README's old opt-in left a marker-only old ID dir: the first install honours it, and once the user
+# removes the new module's marker a reflash installs the full module again
+new_root
+OLD="$W/data/adb/modules/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
+mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
+rm -rf "$MOD"
+mkdir -p "$OLD" && touch "$OLD/scripts-only-mode"
+setprop sys.boot_completed 1
+install_module "$NEW"
+S="marker-only old ID dir"
+check "$S: first install is scripts-only" test -f "$NEW/scripts-only-mode"
+mv "$NEW" "$MOD" && rm -f "$MOD/scripts-only-mode"
+mkdir -p "$NEW" && copy_module "$NEW" && mkdir -p "$NEW/zygisk"
+install_module "$NEW"
+check "$S: reflash without the new marker installs the full module" test -d "$NEW/zygisk" -a ! -f "$NEW/scripts-only-mode"
