@@ -243,3 +243,30 @@ mv "$NEW" "$MOD" && rm -f "$MOD/scripts-only-mode"
 mkdir -p "$NEW" && copy_module "$NEW" && mkdir -p "$NEW/zygisk"
 install_module "$NEW"
 check "$S: reflash without the new marker installs the full module" test -d "$NEW/zygisk" -a ! -f "$NEW/scripts-only-mode"
+
+# both IDs installed (old module kept past a boot): the live new ID config wins, nothing is restored
+# twice and a marker the user removed from the new module does not come back from the old one
+new_root
+OLD="$W/data/adb/modules/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
+mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
+mkdir -p "$OLD" && cp -a "$MOD/." "$OLD/" && mkdir -p "$OLD/zygisk"
+printf 'MANUFACTURER=Google\nMODEL=Pixel New\n' > "$MOD/custom.pif.prop"
+printf 'MANUFACTURER=Google\nMODEL=Pixel Old\n' > "$OLD/custom.pif.prop"
+touch "$OLD/skipdelprop"
+setprop sys.boot_completed 1
+install_module "$NEW"
+S="both IDs installed"
+check "$S: new ID config kept" has_line "$NEW/custom.pif.prop" "MODEL=Pixel New"
+check "$S: custom.pif.prop restored once" test "$(grep -c '^- Restoring custom.pif.prop$' "$W/install.out")" -eq 1
+check "$S: marker absent from the new module not taken from the old" test ! -e "$NEW/skipdelprop"
+check "$S: old module marked for removal" test -f "$OLD/remove"
+
+# a new ID dir holding only module.prop (a manager's entry for an install still pending a reboot) is no
+# installed module: the old ID config is still migrated
+new_root
+old_module
+mkdir -p "$MOD" && cp "$NEW/module.prop" "$MOD/"
+setprop sys.boot_completed 1
+install_module "$NEW"
+check "pending new ID entry: old config migrated" cmp -s "$OLD/custom.pif.prop" "$NEW/custom.pif.prop"
