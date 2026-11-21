@@ -152,7 +152,8 @@ check "old ID upgrade: old module marked for removal" test -f "$OLD/remove"
 check "old ID upgrade: old module left for the manager" test -f "$OLD/module.prop"
 
 # old ID upgrade, then the first boot: the manager runs the old uninstall.sh when it removes the old
-# dir, and the new post-fs-data.sh runs; in either order the next boot leaves the workaround set,
+# dir, and the new post-fs-data.sh runs; in either order the next boot leaves the workaround set (when
+# the removal runs after post-fs-data.sh, it is off for the rest of that boot),
 # the new uninstall.sh holds each prop once and restores the values from before the old module
 for order in old-first new-first; do
     new_root
@@ -170,6 +171,7 @@ for order in old-first new-first; do
     else
         "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
         "$TEST_SH" "$OLD/uninstall.sh" > /dev/null 2>&1; rm -rf "$OLD"
+        check "old ID boot (new-first): workaround reverted until the next boot" test "$(prop persist.sys.pihooks.disable.gms_props)" = false
         "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
     fi
     check "old ID boot ($order): workaround prop set" test "$(prop persist.sys.pihooks.disable.gms_props)" = true
