@@ -229,8 +229,9 @@ check "$S: skipdelprop carried" test -f "$NEW/skipdelprop"
 check "$S: skipaddprop carried" test -f "$NEW/skipaddprop"
 check "$S: old module marked for removal" test -f "$OLD/remove"
 
-# README's old opt-in left a marker-only old ID dir: the first install honours it, and once the user
-# removes the new module's marker a reflash installs the full module again
+# README's old opt-in left a marker-only old ID dir: every install honours it while it is there (as
+# upstream does), the old dir is flagged for removal, and once that dir is gone and the user removes
+# the new module's marker a reflash installs the full module again
 new_root
 OLD="$W/data/adb/modules/playintegrityfix"
 NEW="$W/data/adb/modules_update/playintegrityfork"
@@ -241,10 +242,26 @@ setprop sys.boot_completed 1
 install_module "$NEW"
 S="marker-only old ID dir"
 check "$S: first install is scripts-only" test -f "$NEW/scripts-only-mode"
-mv "$NEW" "$MOD" && rm -f "$MOD/scripts-only-mode"
+check "$S: old marker kept" test -f "$OLD/scripts-only-mode"
+check "$S: old dir flagged for removal" test -f "$OLD/remove"
+mv "$NEW" "$MOD" && rm -f "$MOD/scripts-only-mode" && rm -rf "$OLD"
 mkdir -p "$NEW" && copy_module "$NEW" && mkdir -p "$NEW/zygisk"
 install_module "$NEW"
-check "$S: reflash without the new marker installs the full module" test -d "$NEW/zygisk" -a ! -f "$NEW/scripts-only-mode"
+check "$S: old dir gone, reflash without the new marker installs the full module" test -d "$NEW/zygisk" -a ! -f "$NEW/scripts-only-mode"
+
+# an installed new ID Zygisk module plus a scripts-only marker at the old path (upstream README's
+# instruction): the install is scripts-only and the marker is not deleted unread
+new_root
+OLD="$W/data/adb/modules/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
+mkdir -p "$MOD/zygisk"
+mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/"
+mkdir -p "$OLD" && touch "$OLD/scripts-only-mode"
+setprop sys.boot_completed 1
+install_module "$NEW"
+S="installed new ID module, old path marker"
+check "$S: install is scripts-only" test -f "$NEW/scripts-only-mode" -a ! -d "$NEW/zygisk"
+check "$S: old marker not deleted" test -f "$OLD/scripts-only-mode"
 
 # both IDs installed (old module kept past a boot): the live new ID config wins, nothing is restored
 # twice and a marker the user removed from the new module does not come back from the old one
