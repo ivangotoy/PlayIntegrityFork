@@ -1,6 +1,6 @@
 {
-  "version": "v19(190001)-CI-ci7",
-  "versionCode": 190005,
-  "zipUrl": "https://git.digtvbg.com/ivangotoy/PlayIntegrityFork/releases/download/v19-190001-CI-ci7/PlayIntegrityFork-v19-190001-CI-ci7.zip",
-  "changelog": "https://git.digtvbg.com/ivangotoy/PlayIntegrityFork/raw/commit/a9e0941c750cee56a7ab688f23b314e0988c5489/CHANGELOG.md"
+  "version": "v19(190001)-CI-ci9",
+  "versionCode": 190006,
+  "zipUrl": "https://git.digtvbg.com/ivangotoy/PlayIntegrityFork/releases/download/v19-190001-CI-ci9/PlayIntegrityFork-v19-190001-CI-ci9.zip",
+  "changelog": "https://git.digtvbg.com/ivangotoy/PlayIntegrityFork/raw/commit/a13d3552f5621774de235f15b871ee51583daf91/CHANGELOG.md"
 }
