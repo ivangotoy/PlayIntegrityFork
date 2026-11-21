@@ -1,4 +1,5 @@
 # Allow a scripts-only mode for older Android (<10) which may not require the Zygisk components
+[ -f /data/adb/modules/playintegrityfork/service.sh ] && rm -f /data/adb/modules/playintegrityfix/scripts-only-mode
 if [ -f /data/adb/modules/playintegrityfork/scripts-only-mode -o -f /data/adb/modules/playintegrityfix/scripts-only-mode ]; then
     ui_print "! Installing global scripts only; Zygisk attestation fallback and device spoofing disabled"
     touch $MODPATH/scripts-only-mode
@@ -56,7 +57,6 @@ if [ ! -f /data/adb/modules/playintegrityfork/service.sh ] && [ -f "/data/adb/mo
         fi
     done
 fi
-rm -f /data/adb/modules/playintegrityfix/scripts-only-mode
 
 # Warn if potentially conflicting modules are installed
 if [ -d /data/adb/modules/MagiskHidePropsConf ]; then

@@ -272,3 +272,15 @@ mkdir -p "$MOD" && cp "$NEW/module.prop" "$MOD/"
 setprop sys.boot_completed 1
 install_module "$NEW"
 check "pending new ID entry: old config migrated" cmp -s "$OLD/custom.pif.prop" "$NEW/custom.pif.prop"
+
+# scripts-only mode requested in the old ID dir survives a second flash before the reboot (the manager
+# then holds only a module.prop entry for the pending new ID install)
+new_root
+old_module
+touch "$OLD/scripts-only-mode"
+setprop sys.boot_completed 1
+install_module "$NEW"
+mkdir -p "$MOD" && cp "$NEW/module.prop" "$MOD/"
+rm -rf "$NEW" && mkdir -p "$NEW" && copy_module "$NEW" && mkdir -p "$NEW/zygisk"
+install_module "$NEW"
+check "second flash before reboot: still scripts-only" test -f "$NEW/scripts-only-mode" -a ! -d "$NEW/zygisk"
