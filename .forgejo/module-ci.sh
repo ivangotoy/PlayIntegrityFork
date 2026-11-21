@@ -93,6 +93,7 @@ if [ "$MODE" = build ]; then
     # the export off every other variable (not unset: the caller may export a name this script uses,
     # such as WORK, OUT or BUILD_UID), export these with the builtin, and let env(1) drop by name
     # whatever bash cannot un-export (names that are not identifiers, exported functions).
+    build_rc=0
     (   keep=" PATH JAVA_HOME JAVA_HOME_21 JAVA_HOME_26 SIGN_KEYSTORE_B64 SIGN_KEY_ALIAS SIGN_STORE_PASSWORD SIGN_KEY_PASSWORD SERVER_URL REPOSITORY BASE_SHA GIT_HTTP_LOW_SPEED_LIMIT GIT_HTTP_LOW_SPEED_TIME "
         drop=()
         for v in $(compgen -e); do

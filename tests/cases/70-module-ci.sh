@@ -199,7 +199,8 @@ EOF
             bad "build step $1: setpriv stub not first on PATH, not run"; return
         fi
         _rc=0
-        (cd "$_b" && env PATH="$BW/bin:$BASE_PATH" SETPRIV_LOG="$_b/setpriv.log" SERVER_URL=https://forge.invalid \
+        # build_rc=1 from the caller's environment must not turn a good build into a failed one
+        (cd "$_b" && env PATH="$BW/bin:$BASE_PATH" SETPRIV_LOG="$_b/setpriv.log" SERVER_URL=https://forge.invalid build_rc=1 \
             REPOSITORY=owner/repo BASE_SHA="$(git rev-parse HEAD)" bash .forgejo/module-ci.sh build "$_b") > "$_b/out.log" 2>&1 || _rc=$?
         if [ "$1" = ok ]; then _want=0; [ -f "$_b/.ci-out/module.zip" ] && _res=zip || _res=missing
         else _want=1; grep -q "stub build failed" "$_b/out.log" && _res=stub-failure || _res=missing; fi
