@@ -284,3 +284,25 @@ mkdir -p "$MOD" && cp "$NEW/module.prop" "$MOD/"
 rm -rf "$NEW" && mkdir -p "$NEW" && copy_module "$NEW" && mkdir -p "$NEW/zygisk"
 install_module "$NEW"
 check "second flash before reboot: still scripts-only" test -f "$NEW/scripts-only-mode" -a ! -d "$NEW/zygisk"
+
+# an install whose MODPATH is the module dir itself (an installer that does not use modules_update, as
+# for a flash outside the booted system): the fresh extraction there is not an installed new ID module,
+# so the old ID config is still migrated and the old ID scripts-only marker still counts
+for trig in none old; do
+    new_root
+    OLD="$W/data/adb/modules/playintegrityfix"
+    mkdir -p "$OLD" && cp -a "$MOD/." "$OLD/" && mkdir -p "$OLD/zygisk"
+    printf 'MANUFACTURER=Google\nMODEL=Pixel Old\n' > "$OLD/custom.pif.prop"
+    touch "$OLD/skipdelprop"
+    [ "$trig" = old ] && touch "$OLD/scripts-only-mode"
+    rm -rf "$MOD" && mkdir -p "$MOD" && copy_module "$MOD" && mkdir -p "$MOD/zygisk"
+    setprop sys.boot_completed 1
+    install_module "$MOD"
+    S="MODPATH in modules/ ($trig old marker)"
+    check "$S: skipdelprop migrated" test -f "$MOD/skipdelprop"
+    if [ "$trig" = old ]; then
+        check "$S: scripts-only kept" test -f "$MOD/scripts-only-mode" -a ! -d "$MOD/zygisk"
+    else
+        check "$S: config migrated" cmp -s "$OLD/custom.pif.prop" "$MOD/custom.pif.prop"
+    fi
+done

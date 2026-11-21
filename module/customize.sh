@@ -1,5 +1,5 @@
 # Allow a scripts-only mode for older Android (<10) which may not require the Zygisk components
-[ -f /data/adb/modules/playintegrityfork/service.sh ] && rm -f /data/adb/modules/playintegrityfix/scripts-only-mode
+[ "$MODPATH" != /data/adb/modules/playintegrityfork ] && [ -f /data/adb/modules/playintegrityfork/service.sh ] && rm -f /data/adb/modules/playintegrityfix/scripts-only-mode
 if [ -f /data/adb/modules/playintegrityfork/scripts-only-mode -o -f /data/adb/modules/playintegrityfix/scripts-only-mode ]; then
     ui_print "! Installing global scripts only; Zygisk attestation fallback and device spoofing disabled"
     touch $MODPATH/scripts-only-mode
@@ -44,7 +44,7 @@ for FILE in custom.app_replace_list.txt custom.pif.json custom.pif.prop skipaddp
 done
 
 # Support upgrading from previous module ID
-if [ ! -f /data/adb/modules/playintegrityfork/service.sh ] && [ -f "/data/adb/modules/playintegrityfix/migrate.sh" -o -f "/data/adb/modules/playintegrityfix/scripts-only-mode" ]; then
+if [ ! -f /data/adb/modules/playintegrityfork/service.sh -o "$MODPATH" = /data/adb/modules/playintegrityfork ] && [ -f "/data/adb/modules/playintegrityfix/migrate.sh" -o -f "/data/adb/modules/playintegrityfix/scripts-only-mode" ]; then
     ui_print "! Migrating configuration to new playintegrityfork module ID"
     if [ -d /data/adb/modules/playintegrityfix/system ]; then
         ui_print "- Restoring disabled ROM apps configuration"
