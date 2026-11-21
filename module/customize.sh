@@ -4,6 +4,7 @@ if [ -f /data/adb/modules/playintegrityfork/scripts-only-mode -o -f /data/adb/mo
     touch $MODPATH/scripts-only-mode
     sed -i 's/\(description=\)\(.*\)/\1[Scripts-only mode] \2/' $MODPATH/module.prop
     [ -f /data/adb/modules/playintegrityfork/uninstall.sh ] && sh /data/adb/modules/playintegrityfork/uninstall.sh
+    [ -f /data/adb/modules/playintegrityfix/uninstall.sh ] && sh /data/adb/modules/playintegrityfix/uninstall.sh
     rm -rf $MODPATH/action.sh $MODPATH/app_replace_list.txt \
         $MODPATH/autopif4.sh $MODPATH/classes.dex \
         $MODPATH/common_setup.sh $MODPATH/custom.app_replace_list.txt \
@@ -16,7 +17,15 @@ if [ -f /data/adb/modules/playintegrityfork/scripts-only-mode -o -f /data/adb/mo
         /data/adb/modules/playintegrityfork/skipmatchdevice \
         /data/adb/modules/playintegrityfork/skippersistprop \
         /data/adb/modules/playintegrityfork/system \
-        /data/adb/modules/playintegrityfork/uninstall.sh
+        /data/adb/modules/playintegrityfork/uninstall.sh \
+        /data/adb/modules/playintegrityfix/custom.app_replace_list.txt \
+        /data/adb/modules/playintegrityfix/custom.pif.json \
+        /data/adb/modules/playintegrityfix/custom.pif.prop \
+        /data/adb/modules/playintegrityfix/skipmatchdevice \
+        /data/adb/modules/playintegrityfix/skippersistprop \
+        /data/adb/modules/playintegrityfix/system \
+        /data/adb/modules/playintegrityfix/uninstall.sh
+    [ -d /data/adb/modules/playintegrityfix ] && touch /data/adb/modules/playintegrityfix/remove
 fi
 
 # Copy any disabled app files to updated module

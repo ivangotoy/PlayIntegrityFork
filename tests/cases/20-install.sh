@@ -132,7 +132,7 @@ rm -rf "$MOD"
 setprop sys.boot_completed 1
 install_module "$NEW"
 check "fresh install exits 0" test "$?" -eq 0
-check "fresh install restores nothing" sh -c '! grep -q "Restoring\|Migrating" "$1"' - "$W/install.out"
+check "fresh install restores nothing" sh -c '! grep -qE "Restoring|Migrating" "$1"' - "$W/install.out"
 check "fresh install marks no old module for removal" test ! -e "$W/data/adb/modules/playintegrityfix"
 check "fresh install keeps zygisk" test -d "$NEW/zygisk"
 
@@ -180,12 +180,32 @@ for order in old-first new-first; do
     check "old ID boot ($order): uninstall deletes the created prop" sh -c '! grep -q "^persist.sys.pihooks.first_api_level=" "$1"' - "$W/props"
 done
 
-# scripts-only mode requested in the old ID module dir
-new_root
-old_module
-touch "$OLD/scripts-only-mode"
-setprop sys.boot_completed 1
-install_module "$NEW"
-check "old ID scripts-only: marker set" test -f "$NEW/scripts-only-mode"
-check "old ID scripts-only: zygisk removed" test ! -e "$NEW/zygisk"
-check "old ID scripts-only: description" grep -q '^description=\[Scripts-only mode\]' "$NEW/module.prop"
+# scripts-only mode with a full old ID install, requested by the marker in either module dir (README:
+# create scripts-only-mode in the module dir, then reflash): the old module's uninstall.sh runs, none of
+# its config reaches the stripped module, migrate.sh is not called and the old module is marked for removal
+for trig in old new; do
+    new_root
+    old_module
+    printf '{\n  "MODEL": "Pixel Old"\n}\n' > "$OLD/custom.pif.json"
+    setprop persist.sys.pihooks.disable.gms_props true
+    setprop persist.sys.pihooks.first_api_level ""
+    if [ "$trig" = old ]; then
+        touch "$OLD/scripts-only-mode"
+    else
+        mkdir -p "$MOD" && touch "$MOD/scripts-only-mode"
+    fi
+    setprop sys.boot_completed 1
+    install_module "$NEW"
+    S="scripts-only ($trig ID marker) over the old ID"
+    check "$S: marker set" test -f "$NEW/scripts-only-mode"
+    check "$S: zygisk removed" test ! -e "$NEW/zygisk"
+    check "$S: description" grep -q '^description=\[Scripts-only mode\]' "$NEW/module.prop"
+    for f in custom.pif.prop custom.pif.json custom.app_replace_list.txt uninstall.sh system; do
+        check "$S: old $f not carried" test ! -e "$NEW/$f"
+    done
+    check "$S: removed migrate.sh not called" sh -c '! grep -q "migrate.sh" "$1"' - "$W/install.out"
+    check "$S: old uninstall.sh restores the original value" test "$(prop persist.sys.pihooks.disable.gms_props)" = false
+    check "$S: old uninstall.sh deletes the created prop" sh -c '! grep -q "^persist.sys.pihooks.first_api_level=" "$1"' - "$W/props"
+    check "$S: old module marked for removal" test -f "$OLD/remove"
+    check "$S: skipdelprop carried as in a same-ID update" test -f "$NEW/skipdelprop"
+done
