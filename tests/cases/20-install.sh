@@ -11,7 +11,7 @@ install_module() {
 }
 
 new_root
-NEW="$W/data/adb/modules_update/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
 mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
 cat > "$MOD/custom.pif.prop" <<'PIF'
 MANUFACTURER=Google
@@ -33,7 +33,7 @@ check "skippersistprop runs uninstall.sh" has_line "$W/calls.log" "resetprop -p 
 
 # custom.pif.json from an old release is migrated during install
 new_root
-NEW="$W/data/adb/modules_update/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
 mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
 cat > "$MOD/custom.pif.json" <<'PIF'
 {
@@ -52,7 +52,7 @@ check "migrated json derives BRAND" has_text "$NEW/custom.pif.json" '"BRAND": "g
 
 # scripts-only mode
 new_root
-NEW="$W/data/adb/modules_update/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
 mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/"
 touch "$MOD/scripts-only-mode"
 setprop sys.boot_completed 1
@@ -68,7 +68,7 @@ check "scripts-only description" grep -q '^description=\[Scripts-only mode\]' "$
 # moves /data/adb; unzip/strings are stubbed to give the overlay apk a made-up package name. A runner
 # sh without [[ (dash) prints neither message, hence "at most once".
 new_root
-NEW="$W/data/adb/modules_update/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
 mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
 sed -i "s#^\( *\)/system/\*) ;;#\1$W/system/*) ;;#" "$NEW/common_setup.sh"
 check "app list: /system arm moved under the fake root" grep -qF "$W/system/*) ;;" "$NEW/common_setup.sh"
@@ -89,7 +89,7 @@ check "app list: overlay config message printed at most once" test "$(grep -c 'z
 # app hide list: an overlay entry that is neither a directory nor an .apk gets no APK of its own, so
 # it must not reuse the previous entry's APK and comment out that package in its own overlay config.
 new_root
-NEW="$W/data/adb/modules_update/playintegrityfix"
+NEW="$W/data/adb/modules_update/playintegrityfork"
 mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
 mkdir -p "$W/product/overlay/ZzOverlay" "$W/product/overlay/config" "$W/odm/overlay/config"
 echo apk > "$W/product/overlay/ZzOverlay/ZzOverlay.apk"
@@ -104,3 +104,88 @@ setprop sys.boot_completed 1
 install_module "$NEW"
 check "app list: overlay apk entry still commented out in its config" grep -qF '<!-- overlay package="zz.overlay.pkg"' "$NEW/system$W/product/overlay/config/config.xml"
 check "app list: non-apk overlay entry does not reuse the previous apk" test ! -e "$NEW/system$W/odm/overlay/config/config.xml"
+
+# install paths across the module ID rename (playintegrityfix -> playintegrityfork)
+OLDID_FILES="custom.app_replace_list.txt custom.pif.prop skipaddprop skipdelprop skipmatchdevice uninstall.sh"
+
+# old_module: a previous playintegrityfix install of this module at $OLD with config, the new ID
+# module dir $MOD gone; $NEW is the modules_update dir being installed
+old_module() {
+    OLD="$W/data/adb/modules/playintegrityfix"
+    NEW="$W/data/adb/modules_update/playintegrityfork"
+    mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
+    mkdir -p "$OLD" && cp -a "$MOD/." "$OLD/" && mkdir -p "$OLD/zygisk"
+    rm -rf "$MOD"
+    printf 'MANUFACTURER=Google\nMODEL=Pixel Old\n' > "$OLD/custom.pif.prop"
+    echo /system/app/ZzOld > "$OLD/custom.app_replace_list.txt"
+    for f in skipaddprop skipdelprop skipmatchdevice; do touch "$OLD/$f"; done
+    printf '%s\n' "resetprop -n -p \"persist.sys.pihooks.disable.gms_props\" 'false'" \
+        'resetprop -p --delete "persist.sys.pihooks.first_api_level"' > "$OLD/uninstall.sh"
+    mkdir -p "$OLD/system/product/app/ZzOld"
+}
+
+# fresh install: no previous module under either ID
+new_root
+NEW="$W/data/adb/modules_update/playintegrityfork"
+mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
+rm -rf "$MOD"
+setprop sys.boot_completed 1
+install_module "$NEW"
+check "fresh install exits 0" test "$?" -eq 0
+check "fresh install restores nothing" sh -c '! grep -q "Restoring\|Migrating" "$1"' - "$W/install.out"
+check "fresh install marks no old module for removal" test ! -e "$W/data/adb/modules/playintegrityfix"
+check "fresh install keeps zygisk" test -d "$NEW/zygisk"
+
+# upgrade from the old ID: config carried once, old module marked for removal and left in place
+new_root
+old_module
+setprop sys.boot_completed 1
+install_module "$NEW"
+check "old ID upgrade exits 0" test "$?" -eq 0
+check "old ID upgrade: migration announced" grep -q 'Migrating configuration to new playintegrityfork' "$W/install.out"
+for f in $OLDID_FILES; do
+    check "old ID upgrade: $f carried" cmp -s "$OLD/$f" "$NEW/$f"
+    check "old ID upgrade: $f restored once" test "$(grep -c "^- Restoring $f\$" "$W/install.out")" -eq 1
+done
+check "old ID upgrade: disabled ROM apps carried" test -d "$NEW/system/product/app/ZzOld"
+check "old ID upgrade: old module marked for removal" test -f "$OLD/remove"
+check "old ID upgrade: old module left for the manager" test -f "$OLD/module.prop"
+
+# old ID upgrade, then the first boot: the manager runs the old uninstall.sh when it removes the old
+# dir, and the new post-fs-data.sh runs; in either order the next boot leaves the workaround set,
+# the new uninstall.sh holds each prop once and restores the values from before the old module
+for order in old-first new-first; do
+    new_root
+    old_module
+    setprop ro.aospa.version 1
+    setprop persist.sys.pihooks.disable.gms_props true
+    setprop persist.sys.pihooks.first_api_level ""
+    setprop sys.boot_completed 1
+    install_module "$NEW"
+    setprop sys.boot_completed 0
+    rm -rf "$MOD" && mv "$NEW" "$MOD"
+    if [ "$order" = old-first ]; then
+        "$TEST_SH" "$OLD/uninstall.sh" > /dev/null 2>&1; rm -rf "$OLD"
+        "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
+    else
+        "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
+        "$TEST_SH" "$OLD/uninstall.sh" > /dev/null 2>&1; rm -rf "$OLD"
+        "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
+    fi
+    check "old ID boot ($order): workaround prop set" test "$(prop persist.sys.pihooks.disable.gms_props)" = true
+    check "old ID boot ($order): uninstall.sh holds gms_props once" test "$(grep -c 'persist.sys.pihooks.disable.gms_props' "$MOD/uninstall.sh")" -eq 1
+    check "old ID boot ($order): uninstall.sh holds first_api_level once" test "$(grep -c 'persist.sys.pihooks.first_api_level' "$MOD/uninstall.sh")" -eq 1
+    "$TEST_SH" "$MOD/uninstall.sh" > /dev/null 2>&1
+    check "old ID boot ($order): uninstall restores the original value" test "$(prop persist.sys.pihooks.disable.gms_props)" = false
+    check "old ID boot ($order): uninstall deletes the created prop" sh -c '! grep -q "^persist.sys.pihooks.first_api_level=" "$1"' - "$W/props"
+done
+
+# scripts-only mode requested in the old ID module dir
+new_root
+old_module
+touch "$OLD/scripts-only-mode"
+setprop sys.boot_completed 1
+install_module "$NEW"
+check "old ID scripts-only: marker set" test -f "$NEW/scripts-only-mode"
+check "old ID scripts-only: zygisk removed" test ! -e "$NEW/zygisk"
+check "old ID scripts-only: description" grep -q '^description=\[Scripts-only mode\]' "$NEW/module.prop"

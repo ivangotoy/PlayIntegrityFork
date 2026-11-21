@@ -24,7 +24,7 @@ has_text() { grep -qF -- "$2" "$1" 2>/dev/null; }
 new_root() {
     W="$(mktemp -d "$WORK/case.XXXXXX")"
     W="$(cd -P "$W" && pwd)"
-    MOD="$W/data/adb/modules/playintegrityfix"
+    MOD="$W/data/adb/modules/playintegrityfork"
     mkdir -p "$W/bin" "$MOD" "$W/data/adb/magisk" "$W/data/data/com.google.android.gms" \
         "$W/data/system" "$W/sys/fs/selinux" "$W/dev"
     copy_module "$MOD"
