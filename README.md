@@ -27,7 +27,7 @@ Note: Unless otherwise stated, verdicts here are all referring to the Android <1
 
 ## Configuration
 
-The module is configured by editing prop or txt (text) files in the module directory (/data/adb/modules/playintegrityfix), by running one of the included scripts there, or by creating a file there to enable some advanced features. These are most easily done using the root file explorer app of your choice, as all should include a file editor and support script execution. The scripts also support command line arguments, which may be added when run from a root file explorer app, or when run in a root (su) shell from adb or a terminal emulator app. Unless otherwise stated, configuration changes will take effect after running the killpi.sh script to restart the Play Integrity (PI) processes, or you may also reboot.
+The module is configured by editing prop or txt (text) files in the module directory (/data/adb/modules/playintegrityfork), by running one of the included scripts there, or by creating a file there to enable some advanced features. These are most easily done using the root file explorer app of your choice, as all should include a file editor and support script execution. The scripts also support command line arguments, which may be added when run from a root file explorer app, or when run in a root (su) shell from adb or a terminal emulator app. Unless otherwise stated, configuration changes will take effect after running the killpi.sh script to restart the Play Integrity (PI) processes, or you may also reboot.
 
 ### About 'custom.pif.prop' file
 
@@ -183,7 +183,7 @@ An advanced feature intended for older Android <10 ROMs, mostly stock ROMs or th
 <details>
 <summary><strong>Details</strong></summary>
 
-- Manually opt-in by creating a file named scripts-only-mode in the module directory, either from a root prompt with `mkdir -p /data/adb/modules/playintegrityfix; touch /data/adb/modules/playintegrityfix/scripts-only-mode` or from a file explorer app, and then re/flashing the module. Scripts-only mode will remain enabled until this file is removed and the module is reflashed again.
+- Manually opt-in by creating a file named scripts-only-mode in the module directory, either from a root prompt with `mkdir -p /data/adb/modules/playintegrityfork; touch /data/adb/modules/playintegrityfork/scripts-only-mode` or from a file explorer app, and then re/flashing the module. Scripts-only mode will remain enabled until this file is removed and the module is reflashed again.
 
 - During install all unused default mode files (including custom.pif.json) are removed from the module directory, effectively disabling the Zygisk components of PIF: attestation fallback and device spoofing. You'll see "Scripts-only mode" indicated in the module description in your root manager app.
 
@@ -193,15 +193,15 @@ An advanced feature intended for older Android <10 ROMs, mostly stock ROMs or th
 
 ## About skipping device matching from the Action button
 
-An advanced feature intended for those running a Pixel device that is supported by Google for Pixel Beta program builds but don't want to use the matching Pixel Canary fingerprint for their device when generating one with the Action button. To use a random Pixel Canary fingerprint instead, manually opt-in by creating a file named skipmatchdevice in the module directory after installation, either from a root prompt with `touch /data/adb/modules/playintegrityfix/skipmatchdevice` or from a file explorer app, then run Action again.
+An advanced feature intended for those running a Pixel device that is supported by Google for Pixel Beta program builds but don't want to use the matching Pixel Canary fingerprint for their device when generating one with the Action button. To use a random Pixel Canary fingerprint instead, manually opt-in by creating a file named skipmatchdevice in the module directory after installation, either from a root prompt with `touch /data/adb/modules/playintegrityfork/skipmatchdevice` or from a file explorer app, then run Action again.
 
 ## About skipping property deletion
 
-An advanced feature (unrelated to Play Integrity) intended for those who also need to use apps which detect prop tampering. To avoid triggering these detections by skipping any `resetprop --delete` commands in the module scripts, manually opt-in by creating a file named skipdelprop in the module directory after installation, either from a root prompt with `touch /data/adb/modules/playintegrityfix/skipdelprop` or from a file explorer app, then reboot.
+An advanced feature (unrelated to Play Integrity) intended for those who also need to use apps which detect prop tampering. To avoid triggering these detections by skipping any `resetprop --delete` commands in the module scripts, manually opt-in by creating a file named skipdelprop in the module directory after installation, either from a root prompt with `touch /data/adb/modules/playintegrityfork/skipdelprop` or from a file explorer app, then reboot.
 
 ## About skipping persist property changes
 
-An advanced feature (unrelated to Play Integrity) intended for those who want to bypass the module's finding that their custom ROM may need these properties set to disable the ROM's conflicting integrated PI features; some root checker apps detect these properties even though no known real-world apps/games detect them. To avoid triggering these detections by skipping any persist property modification/creation in the module scripts, manually opt-in by creating a file named skippersistprop in the module directory after installation, either from a root prompt with `touch /data/adb/modules/playintegrityfix/skippersistprop` or from a file explorer app, then reboot.
+An advanced feature (unrelated to Play Integrity) intended for those who want to bypass the module's finding that their custom ROM may need these properties set to disable the ROM's conflicting integrated PI features; some root checker apps detect these properties even though no known real-world apps/games detect them. To avoid triggering these detections by skipping any persist property modification/creation in the module scripts, manually opt-in by creating a file named skippersistprop in the module directory after installation, either from a root prompt with `touch /data/adb/modules/playintegrityfork/skippersistprop` or from a file explorer app, then reboot.
 
 ## About Play Integrity (SafetyNet has been shut down)
 
