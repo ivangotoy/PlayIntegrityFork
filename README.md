@@ -212,3 +212,7 @@ Forked from chiteroman's [Play Integrity Fix (PIF)](https://github.com/chiteroma
 Original concept and general mechanism of PIF from kdrag0n's [ProtonAOSP](https://protonaosp.org/) and [Universal SafetyNet Fix (USNF)](https://github.com/kdrag0n/safetynet-fix) projects.
 
 Module boot scripts adapted from those of Displax's forked [Universal SafetyNet Fix (USNF MOD)](https://github.com/Displax/safetynet-fix); please see the module files [commit history](https://github.com/Displax/safetynet-fix/commits/dev/magisk) for proper attribution.
+
+## More KernelSU modules
+
+Check out my other great KernelSU modules here: https://git.digtvbg.com/explore/repos?q=kernelsu-module&topic=1
