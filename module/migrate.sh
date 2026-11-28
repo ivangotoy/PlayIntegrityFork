@@ -350,7 +350,7 @@ if [ "$FORMAT" = json ]; then
     s = $0; n = length(s); o = "";
     for (i = 1; i <= n; i++) {
       c = substr(s, i, 1);
-      if (c == "\\") { d = substr(s, i + 1, 1); if (d ~ /["\\\/bfnrtu]/) { o = o c d; i++; } else o = o "\\\\"; }
+      if (c == "\\") { d = substr(s, i + 1, 1); if (d ~ /["\\\/bfnrt]/ || substr(s, i + 1, 5) ~ /^u[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$/) { o = o c d; i++; } else o = o "\\\\"; }
       else o = o c;
     }
     print o;
