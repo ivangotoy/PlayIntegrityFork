@@ -358,6 +358,8 @@ public:
                     size_t lastPos = value.find_last_not_of(" ");
                     if (lastPos != std::string::npos) value.resize(lastPos + 1);
                 }
+                // trailing blanks are not part of a value, as for migrate.sh, autopif4.sh and the WebUI
+                value.erase(value.find_last_not_of(" \t") + 1);
                 for (std::string *field : {&name, &value}) {
                     std::string escaped;
                     for (unsigned char c : *field) {

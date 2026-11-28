@@ -1,7 +1,8 @@
 # Config loading in preAppSpecialize against the real nlohmann/json header (the json submodule,
-# or PIF_JSON_HPP): every config that parsed before parses to the same result, configs that
-# failed only on stray quotes/backslashes or invalid UTF-8 now parse, and a config that still
-# does not parse to an object takes the missing-config path. Skipped visibly without the header.
+# or PIF_JSON_HPP): every config that parsed before parses to the same result (except trailing
+# blanks of prop values, now dropped as the shell readers drop them), configs that failed only on
+# stray quotes/backslashes or invalid UTF-8 now parse, and a config that still does not parse to
+# an object takes the missing-config path. Skipped visibly without the header.
 
 CPP="$ROOT/app/src/main/cpp/main.cpp"
 HPP="${PIF_JSON_HPP:-$ROOT/app/src/main/cpp/json/single_include/nlohmann/json.hpp}"
