@@ -21,7 +21,16 @@ else
     (cd "$W/seed" && git init -q && git checkout -q -b main && git add -A \
         && git -c user.name=t -c user.email=t@example.invalid commit -q -m seed \
         && git push -q "$F/$R.git" main) > "$W/seed.log" 2>&1
-    BASE="$(git --git-dir="$F/$R.git" rev-parse main)"
+    seed_rc=$?
+    BASE="$(git --git-dir="$F/$R.git" rev-parse main 2>/dev/null)"
+    # a failed seed leaves BASE empty and module-ci.sh dies at once: the failure scenarios would pass for that
+    # reason alone, the success ones would fail without saying why
+    case "$seed_rc $BASE" in
+        "0 "[0-9a-f]*) [ "${#BASE}" -eq 40 ] && seed_ok=1 || seed_ok=0 ;;
+        *) seed_ok=0 ;;
+    esac
+    if [ "$seed_ok" = 1 ]; then ok "scenario setup: fake forge seeded, main at a commit"
+    else bad "scenario setup: fake forge seeded, main at a commit (seed rc=$seed_rc, main='$BASE')"; sed 's/^/    | /' "$W/seed.log"; fi
     OUTD="$W/build/.ci-out"; mkdir -p "$OUTD" "$W/mod"
     printf '%s\n\n' "$BASE" > "$OUTD/src"
     echo "" > "$OUTD/desc"
@@ -83,9 +92,17 @@ STUB
         bash "$ROOT/.forgejo/module-ci.sh" release "$W/build") > "$W/release.out" 2>&1
     rc=$?
     }
+    # show_red <rc wanted>: on an unexpected exit status print the run's output, so a red run names its failing step
+    show_red() {
+        if [ "$1" = 0 ] && [ "$rc" -eq 0 ]; then return; fi
+        if [ "$1" != 0 ] && [ "$rc" -ne 0 ]; then return; fi
+        sed 's/^/    | /' "$W/release.out" | tail -n 15
+        # a death under set -e can be silent: the last git/curl calls name the step
+        sed 's/^/    argv | /' "$W/argv.log" 2>/dev/null | tail -n 5
+    }
     rel_scenario ""
     check "module-ci.sh release exits 0 (offline forge)" test "$rc" -eq 0
-    [ "$rc" -eq 0 ] || sed 's/^/    | /' "$W/release.out" | tail -n 15
+    show_red 0
     check "release published at the dispatched commit" test "$(cat "$W/state/published" 2>/dev/null)" = "$BASE"
     check "update.json committed with the new versionCode" sh -c 'git --git-dir="$1" show main:.forgejo/update.json | grep -q "\"versionCode\": 100"' - "$F/$R.git"
     check "uploaded zip points updateJson at the forge" sh -c 'unzip -p "$1" module.prop | grep -qx "updateJson=$2"' - "$W/state/asset.zip" "file://$F/$R/raw/branch/main/.forgejo/update.json"
@@ -97,7 +114,7 @@ STUB
     rel_scenario "{\"versionCode\": $((HBUILT + HOFF))}"
     NEXT=$((HBUILT + HOFF + 1))
     check "versionCode equal to the published one: release exits 0" test "$rc" -eq 0
-    [ "$rc" -eq 0 ] || sed 's/^/    | /' "$W/release.out" | tail -n 15
+    show_red 0
     check "versionCode equal to the published one: zip module.prop gets $NEXT" sh -c 'unzip -p "$1" module.prop | grep -qx "versionCode=$2"' - "$W/state/asset.zip" "$NEXT"
     check "versionCode equal to the published one: release text says $NEXT" grep -q "versionCode $NEXT" "$W/state/release-req"
     check "versionCode equal to the published one: update.json gets $NEXT" sh -c 'git --git-dir="$1" show main:.forgejo/update.json | grep -q "\"versionCode\": $2,"' - "$F/$R.git" "$NEXT"
@@ -105,6 +122,8 @@ STUB
     for bad in '{"versionCode": "100"}' '{}' 'not json'; do
         rel_scenario "$bad"
         check "published update.json $bad: release fails" test "$rc" -ne 0
+        show_red 1
+        check "published update.json $bad: stopped by the versionCode check" grep -q "has no readable integer versionCode" "$W/release.out"
         check "published update.json $bad: no forge request, no push" sh -c '! grep -q "^curl " "$1" && test "$(git --git-dir="$2" rev-parse main)" = "$3"' - "$W/argv.log" "$F/$R.git" "$BASE"
         check "published update.json $bad: nothing uploaded or published" test ! -e "$W/state/asset.zip" -a ! -e "$W/state/published"
     done
