@@ -64,6 +64,7 @@ cp "$MOD/custom.pif.prop" "$W/old.prop"
 printf '#!/bin/sh\necho "migrate stub: write failed" >&2\nexit 1\n' > "$MOD/migrate.sh"
 run_autopif
 check "failed migrate.sh: autopif4 fails" test "$?" -ne 0
+check "failed migrate.sh: stopped at the conversion" has_text "$W/autopif.out" "Failed to convert pif.prop with migrate.sh"
 check "failed migrate.sh: live custom.pif.prop unchanged, no backup made" sh -c 'cmp -s "$1" "$2" && test ! -e "$1.bak"' - "$MOD/custom.pif.prop" "$W/old.prop"
 check "failed migrate.sh: Play processes not killed" sh -c '! grep -q "^killall" "$1"' - "$W/calls.log"
 
@@ -76,6 +77,7 @@ mkdir -p "$W/data/adb/tricky_store"
 echo "all=2024-01-01" > "$W/data/adb/tricky_store/security_patch.txt"
 run_autopif
 check "unsafe downloaded value: autopif4 fails" test "$?" -ne 0
+check "unsafe downloaded value: stopped by the value check" has_text "$W/autopif.out" "Unexpected characters in SECURITY_PATCH value"
 check "unsafe downloaded value: no config installed" test ! -e "$MOD/custom.pif.prop"
 check "unsafe downloaded value: Tricky Store file untouched" has_line "$W/data/adb/tricky_store/security_patch.txt" "all=2024-01-01"
 
@@ -85,6 +87,7 @@ sed -i "s;<td>Pixel Test</td>;<td>Pixel \\\$(touch $W/pwned-dl)</td>;" "$W/fix/f
 write_fetch_stubs "$W/fix"
 run_autopif
 check "shell syntax in downloaded MODEL: autopif4 fails" test "$?" -ne 0
+check "shell syntax in downloaded MODEL: stopped by the value check" has_text "$W/autopif.out" "Unexpected characters in MODEL value"
 check "shell syntax in downloaded MODEL: no config installed" test ! -e "$MOD/custom.pif.prop"
 
 # a bulletin page with CRLF line endings still yields a clean SECURITY_PATCH
