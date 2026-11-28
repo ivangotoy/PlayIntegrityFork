@@ -7,8 +7,10 @@ for c in bash python3 git zip unzip sha256sum; do command -v "$c" >/dev/null 2>&
 if [ -n "$need" ]; then
     skip "module-ci.sh release (missing:$need)"
 else
-    # rel_scenario <update.json at BASE, "" = none>: fresh fake forge, seed and build output, then one
-    # release run; the module builds versionCode $HBUILT and the conf adds $HOFF
+    # rel_scenario <update.json at BASE, "" = none> [update.json a later commit on main sets, "" = none]
+    #     [release list page 1] [page 2] ...: fresh fake forge, seed and build output, then one release
+    # run; the module builds versionCode $HBUILT and the conf adds $HOFF. A page is the JSON the list
+    # API answers (FAIL = the request fails); pages not given are empty lists.
     HBUILT=100; HOFF=0
     rel_scenario() {
     new_root
@@ -23,6 +25,14 @@ else
         && git push -q "$F/$R.git" main) > "$W/seed.log" 2>&1
     seed_rc=$?
     BASE="$(git --git-dir="$F/$R.git" rev-parse main 2>/dev/null)"
+    # a later run's update.json commit on main after the dispatched commit (the seeded file is replaced)
+    if [ "$seed_rc" = 0 ] && [ -n "${2:-}" ]; then
+        rm -f "$W/seed/.forgejo/update.json"; printf '%s\n' "$2" > "$W/seed/.forgejo/update.json"
+        (cd "$W/seed" && git add -A && git -c user.name=t -c user.email=t@example.invalid commit -q -m later \
+            && git push -q "$F/$R.git" main) >> "$W/seed.log" 2>&1 || seed_rc=$?
+    fi
+    _pg=1; [ "$#" -gt 2 ] && shift 2 || set --
+    for _page in "$@"; do printf '%s\n' "$_page" > "$W/state/releases-$_pg.json"; _pg=$((_pg + 1)); done
     # a failed seed leaves BASE empty and module-ci.sh dies at once: the failure scenarios would pass for that
     # reason alone, the success ones would fail without saying why
     case "$seed_rc $BASE" in
@@ -84,6 +94,11 @@ case "$m $p" in
     "DELETE /api/v1/repos/$R/releases/7") : > "$S/deleted"; echo '{}' | emit ;;
     "GET /$R/releases/download/"*) [ -f "$S/published" ] || fail "download before publish"; cat "$S/asset.zip" | emit ;;
     "GET /$R/raw/branch/main/.forgejo/update.json") git --git-dir="$F/$R.git" show main:.forgejo/update.json | emit ;;
+    "GET /api/v1/repos/$R/releases?page="*)
+        pg="${p#*page=}"; pg="${pg%%&*}"
+        if [ ! -f "$S/releases-$pg.json" ]; then printf '[]' | emit
+        elif [ "$(cat "$S/releases-$pg.json")" = FAIL ]; then fail "release list unavailable"
+        else cat "$S/releases-$pg.json" | emit; fi ;;
     *) fail "unexpected $m $url" ;;
 esac
 STUB
@@ -126,6 +141,39 @@ STUB
         check "published update.json $bad: stopped by the versionCode check" grep -q "has no readable integer versionCode" "$W/release.out"
         check "published update.json $bad: no forge request, no push" sh -c '! grep -q "^curl " "$1" && test "$(git --git-dir="$2" rev-parse main)" = "$3"' - "$W/argv.log" "$F/$R.git" "$BASE"
         check "published update.json $bad: nothing uploaded or published" test ! -e "$W/state/asset.zip" -a ! -e "$W/state/published"
+    done
+
+    # the published versionCode is the highest of update.json at main's tip and the "versionCode N" line
+    # of every published release (all list pages; drafts ignored; neither the first entry nor the
+    # highest id decides): vc_case <label> <versionCode wanted>
+    vc_case() {
+        check "$1: release exits 0" test "$rc" -eq 0
+        show_red 0
+        check "$1: zip module.prop gets $2" sh -c 'unzip -p "$1" module.prop | grep -qx "versionCode=$2"' - "$W/state/asset.zip" "$2"
+        check "$1: release text says $2" grep -q "versionCode $2" "$W/state/release-req"
+        check "$1: update.json gets $2" sh -c 'git --git-dir="$1" show main:.forgejo/update.json | grep -q "\"versionCode\": $2,"' - "$F/$R.git" "$2"
+    }
+    rel_scenario '{"versionCode": 100}' '{"versionCode": 150}'
+    vc_case "update.json at main's tip newer than at the dispatched commit" 151
+    rel_scenario '{"versionCode": 100}' "" '[{"id": 3, "draft": false, "body": "Built by module-release #4 from abc (fork main).\nversionCode 120\nsha256 0  x.zip"}]'
+    vc_case "published release above update.json" 121
+    rel_scenario "" "" '[{"id": 30, "draft": false, "body": "versionCode 120"}, {"id": 25, "draft": true, "body": "versionCode 999"}]' \
+        '[{"id": 10, "draft": false, "body": "Built\r\nversionCode 140\r\nsha256 0"}, {"id": 20, "draft": false, "body": "versionCode 130"}, {"id": 9, "draft": false, "body": null}]'
+    vc_case "highest release versionCode on page 2, not the first entry nor the highest id" 141
+    rel_scenario '{"versionCode": 100}' "" '[{"id": 5, "draft": true, "body": "versionCode 500"}, {"id": 4, "draft": false, "body": "versionCode 102"}]'
+    vc_case "draft release ignored" 103
+    # an unreadable release list or update.json at main's tip stops the release before anything is published
+    for sc in "list:FAIL:release list page 1 unreadable" "list:not json:release list page 1 is not a JSON list" \
+        'list:{"id": 1}:release list page 1 is not a JSON list' 'tip:{"versionCode": "x"}:has no readable integer versionCode'; do
+        _k="${sc%%:*}"; _r="${sc#*:}"; _v="${_r%:*}"; _want="${_r##*:}"
+        if [ "$_k" = list ]; then rel_scenario '{"versionCode": 100}' "" "$_v"; else rel_scenario '{"versionCode": 100}' "$_v"; fi
+        _tip="$(git --git-dir="$F/$R.git" rev-parse main)"
+        check "$_k $_v: release fails" test "$rc" -ne 0
+        show_red 1
+        check "$_k $_v: stopped by its check" grep -q "$_want" "$W/release.out"
+        check "$_k $_v: no draft, upload, publish or delete request, no push" \
+            sh -c '! grep -qE "^curl .*-X (POST|PATCH|DELETE)" "$1" && test "$(git --git-dir="$2" rev-parse main)" = "$3"' - "$W/argv.log" "$F/$R.git" "$_tip"
+        check "$_k $_v: nothing uploaded or published" test ! -e "$W/state/asset.zip" -a ! -e "$W/state/published"
     done
 fi
 

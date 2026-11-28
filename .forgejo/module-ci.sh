@@ -179,15 +179,36 @@ case "$BUILT_VC" in ''|*[!0-9]*) die "built versionCode '$BUILT_VC' is not a num
 VERSION="$(printf '%s' "$BUILT_VERSION" | sed -E 's/-(fork|ci)[0-9]+$//')-ci$RUN_NUMBER"
 VC=$((BUILT_VC + VERSION_CODE_OFFSET))
 [ "$VC" -ge "$VERSION_CODE_FLOOR" ] || die "versionCode $VC is below the floor $VERSION_CODE_FLOOR"
-# root managers offer only a versionCode above the published update.json's (as of the dispatched
-# commit; no file = nothing published): raise VC above it, stop on an unreadable one
+# root managers offer only a versionCode above the published one. Published = update.json at main's
+# tip (this clone's HEAD: a later run may have committed one after the dispatched commit; no file = 0)
+# and the "versionCode N" body line of every published release (a run that failed after publishing
+# committed no update.json). Raise VC above the highest; an unreadable one stops the release here,
+# before anything is published.
 LAST_VC=0
-if git cat-file -e "$BASE_SHA:$UPDATE_JSON_PATH" 2>/dev/null; then
-    LAST_VC="$(git show "$BASE_SHA:$UPDATE_JSON_PATH" | python3 -I -c 'import json,sys
-v=json.load(sys.stdin)["versionCode"]
+if git cat-file -e "HEAD:$UPDATE_JSON_PATH" 2>/dev/null; then
+    git show "HEAD:$UPDATE_JSON_PATH" > "$REL/last-update.json" || die "cannot read $UPDATE_JSON_PATH at main"
+    LAST_VC="$(python3 -I -c 'import json,sys
+v=json.load(open(sys.argv[1]))["versionCode"]
 if type(v) is not int or v < 0: sys.exit("not a non-negative integer")
-print(v)')" || die "$UPDATE_JSON_PATH at $BASE_SHA has no readable integer versionCode"
+print(v)' "$REL/last-update.json")" || die "$UPDATE_JSON_PATH at main has no readable integer versionCode"
 fi
+page=1
+while :; do
+    api GET "/releases?page=$page&limit=50" > "$REL/releases.json" || die "release list page $page unreadable"
+    # "<entries on the page> <highest versionCode line among its published releases>"
+    got="$(python3 -I -c 'import json,re,sys
+d=json.load(open(sys.argv[1]))
+if type(d) is not list or any(type(r) is not dict for r in d): sys.exit("not a list of releases")
+m=0
+for r in d:
+    if r.get("draft") is False and isinstance(r.get("body"), str):
+        for v in re.findall(r"^versionCode ([0-9]+)\r?$", r["body"], re.M): m=max(m, int(v))
+print(len(d), m)' "$REL/releases.json")" || die "release list page $page is not a JSON list of releases"
+    [ "${got% *}" = 0 ] && break
+    [ "${got#* }" -le "$LAST_VC" ] || LAST_VC="${got#* }"
+    page=$((page + 1))
+    [ "$page" -le 1000 ] || die "release list has more than 1000 pages"
+done
 if [ "$VC" -le "$LAST_VC" ]; then
     log "versionCode $VC is not above the published $LAST_VC: using $((LAST_VC + 1))"
     VC=$((LAST_VC + 1))
