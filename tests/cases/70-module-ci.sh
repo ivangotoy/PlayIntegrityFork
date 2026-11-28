@@ -103,6 +103,7 @@ case "$m $p" in
 esac
 STUB
     chmod 755 "$W/bin/curl" "$W/bin/git"
+    TIP_BEFORE="$(git --git-dir="$F/$R.git" rev-parse main 2>/dev/null)"
     (cd "$W/run" && SERVER_URL="file://$F" REPOSITORY="$R" BASE_SHA="$BASE" RELEASE_TOKEN="$TOKEN" RUN_NUMBER=5 \
         bash "$ROOT/.forgejo/module-ci.sh" release "$W/build") > "$W/release.out" 2>&1
     rc=$?
@@ -162,17 +163,20 @@ STUB
     vc_case "highest release versionCode on page 2, not the first entry nor the highest id" 141
     rel_scenario '{"versionCode": 100}' "" '[{"id": 5, "draft": true, "body": "versionCode 500"}, {"id": 4, "draft": false, "body": "versionCode 102"}]'
     vc_case "draft release ignored" 103
+    rel_scenario '{"versionCode": 100}' '{"versionCode": 150}' '[{"id": 8, "draft": false, "body": "versionCode 120"}]'
+    vc_case "update.json at main's tip above every release" 151
+    rel_scenario "" "" '[{"id": 8, "draft": false, "body": "versionCode 140"}]' '[{"id": 2, "draft": false, "body": "versionCode 120"}]'
+    vc_case "highest release versionCode on page 1, a lower one on page 2" 141
     # an unreadable release list or update.json at main's tip stops the release before anything is published
     for sc in "list:FAIL:release list page 1 unreadable" "list:not json:release list page 1 is not a JSON list" \
         'list:{"id": 1}:release list page 1 is not a JSON list' 'tip:{"versionCode": "x"}:has no readable integer versionCode'; do
         _k="${sc%%:*}"; _r="${sc#*:}"; _v="${_r%:*}"; _want="${_r##*:}"
         if [ "$_k" = list ]; then rel_scenario '{"versionCode": 100}' "" "$_v"; else rel_scenario '{"versionCode": 100}' "$_v"; fi
-        _tip="$(git --git-dir="$F/$R.git" rev-parse main)"
         check "$_k $_v: release fails" test "$rc" -ne 0
         show_red 1
         check "$_k $_v: stopped by its check" grep -q "$_want" "$W/release.out"
         check "$_k $_v: no draft, upload, publish or delete request, no push" \
-            sh -c '! grep -qE "^curl .*-X (POST|PATCH|DELETE)" "$1" && test "$(git --git-dir="$2" rev-parse main)" = "$3"' - "$W/argv.log" "$F/$R.git" "$_tip"
+            sh -c '! grep -qE "^curl .*-X (POST|PATCH|DELETE)" "$1" && test "$(git --git-dir="$2" rev-parse main)" = "$3"' - "$W/argv.log" "$F/$R.git" "$TIP_BEFORE"
         check "$_k $_v: nothing uploaded or published" test ! -e "$W/state/asset.zip" -a ! -e "$W/state/published"
     done
 fi
