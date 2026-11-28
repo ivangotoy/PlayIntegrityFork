@@ -6,6 +6,12 @@ name: module-release
 on:
   workflow_dispatch:
 
+# one release run at a time: a second dispatch waits for the running one instead of racing it on the
+# versionCode, the tag and the update.json commit
+concurrency:
+  group: module-release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: kernelsu-ci

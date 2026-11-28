@@ -21,6 +21,20 @@ cd "$1" && ! { find .forgejo/workflows .github app/src/main/java module -type f 
         app/src/main/cpp/CMakeLists.txt app/src/main/cpp/main.cpp; } | xargs grep -l "$2" | grep -q .' - "$ROOT" "$S"
 check "no signingConfig in app/build.gradle.kts" sh -c '! grep -q signingConfig "$1"' - "$ROOT/app/build.gradle.kts"
 
+# two dispatched runs must not release at the same time (versionCode, tag and update.json race):
+# one top-level concurrency group, a running release never cancelled. Read without PyYAML.
+wf_concurrency() {
+  awk '
+    /^concurrency:[ \t]*$/ { inb = 1; blocks++; next }
+    inb && /^[^ \t#]/ { inb = 0 }
+    inb && /^  group:[ \t]*[^ \t]/ { group++ }
+    inb && /^  cancel-in-progress:[ \t]*false[ \t]*$/ { keep++ }
+    /^[ \t]+concurrency:/ { nested++ }
+    END { exit !(blocks == 1 && group == 1 && keep == 1 && !nested) }
+  ' "$1"
+}
+check "workflow: one top-level concurrency group, cancel-in-progress false" wf_concurrency "$WF"
+
 # The fork releases above the code module.prop builds (already published), so root managers
 # offer it as an update: released versionCode = module.prop's + offset
 off=$(sed -n 's/^VERSION_CODE_OFFSET=//p' "$ROOT/.forgejo/module-ci.conf")
