@@ -28,8 +28,9 @@ check "prop: first api level" has_line "$C" "ro.product.first_api_level=32"
 
 # prop -> json
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -j "$MOD/custom.pif.prop") > "$W/j.out" 2>&1
+mj_rc=$?
 J="$MOD/custom.pif.json"
-check "migrate -j exits 0" test "$?" -eq 0
+check "migrate -j exits 0" test "$mj_rc" -eq 0
 check "json: MODEL" has_line "$J" '    "MODEL": "Pixel Test",'
 check "json: commented security_patch" has_line "$J" '    //"ro.build.version.security_patch": "2025-01-05",'
 check "json: last entry closes object" test "$(tail -n 2 "$J" | tr -d '\n')" = '    "verboseLogs": "2"}'
@@ -64,9 +65,11 @@ spoofBuild=1\$(touch $W/pwned-setting)
 PIF
 mkdir -p "$W/out" && cp "$W/old.prop" "$W/out/custom.pif.prop"
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.prop") > "$W/m.out" 2>&1
+check "prop field value: migrate.sh wrote a new file" test -e "$MOD/custom.pif.prop.bak"
 check "prop field value is not executed" test ! -e "$W/pwned-field"
 check "prop field value kept literally" has_line "$MOD/custom.pif.prop" "MODEL=Pixel \$(touch $W/pwned-field)"
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.prop" "$W/out/custom.pif.prop") > "$W/m2.out" 2>&1
+check "prop advanced setting value: migrate.sh wrote a new file" test -e "$W/out/custom.pif.prop.bak"
 check "prop advanced setting value is not executed" test ! -e "$W/pwned-setting"
 
 # WebUI import of a JSON file into custom.pif.prop, then forced prop migration
@@ -124,6 +127,7 @@ cat > "$MOD/custom.pif.json" <<PIF
 }
 PIF
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/j2.out" 2>&1
+check "json shell syntax outside strings: migrate.sh ran (refused or migrated)" sh -c 'grep -q "Refusing to migrate" "$1" || test -e "$2.bak"' - "$W/j2.out" "$MOD/custom.pif.prop"
 check "json shell syntax outside strings is not executed" test ! -e "$W/pwned-outside"
 check "json escaped backtick in an unused field is not executed" test ! -e "$W/pwned-unused"
 
@@ -135,11 +139,15 @@ check "ordinary json: migrate exits 0" test "$?" -eq 0
 check "ordinary json: output byte-identical to the previous migrate.sh" cmp -s "$MOD/custom.pif.json" "$ROOT/tests/fixtures/migrate/sample.expected.json"
 
 # backslash-quote breakout of the second eval, and // that is no shell comment once newlines are gone
+# migrate_ran <output> <config>: migrate.sh got as far as refusing the file or writing a new one (.bak),
+# so a "not executed" check after it is not passing only because migrate.sh never ran
+migrate_ran() { grep -q "Refusing to migrate" "$1" || test -e "$2.bak"; }
 json_case() {
     # $1 marker name, $2 extra json lines (raw)
     new_root
     printf '{\n  "MANUFACTURER": "Google",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys",\n%s\n  "verboseLogs": "0"\n}\n' "$2" | sed "s#@W@#$W#g" > "$MOD/custom.pif.json"
     (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/$1.out" 2>&1
+    check "json case $1: migrate.sh ran (refused or migrated)" migrate_ran "$W/$1.out" "$MOD/custom.pif.json"
 }
 json_case bsq "  \"MODEL\": \"a\\\\\\\" ; touch @W@/pwned-bsq ; : \\\\\\\"\","
 check "fixture holds the backslash-quote sequence" sh -c 'cat "$1" "$1.bak" 2>/dev/null | grep -qF "$2"' - "$MOD/custom.pif.json" 'a\\\" ; touch /'
@@ -158,7 +166,7 @@ json_case valend2 "  \"MODEL\": \"x\",
 check "json key name at a value end, colon in a key: not executed" test ! -e "$W/pwned-valend2"
 json_case okcolon "  \"MODEL\": \"x\", // see: notes
   \"FOO\": \"time 10:30\","
-check "json ordinary colons in comments and values: not refused" sh -c '! grep -q Refusing "$1"' - "$W/okcolon.out"
+check "json ordinary colons in comments and values: not refused" sh -c '! grep -q Refusing "$1" && test -e "$2.bak" && grep -q "Advanced Settings" "$2"' - "$W/okcolon.out" "$MOD/custom.pif.json"
 json_case splitkey "  \"MODEL\": \"x\",
   \"FOO\": \"y BRA
 ND\", // n: z; touch @W@/pwned-splitkey"
@@ -181,7 +189,7 @@ done
 new_root
 printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "Pixel \\u0041 \\x41",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' > "$MOD/custom.pif.json"
 (cd "$MOD" && "$TEST_SH" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/esc-ok.out" 2>&1
-check "json \\u0041 / \\x41 escapes: not refused" sh -c '! grep -q Refusing "$1"' - "$W/esc-ok.out"
+check "json \\u0041 / \\x41 escapes: not refused" sh -c '! grep -q Refusing "$1" && test -e "$2.bak" && grep -q "Advanced Settings" "$2"' - "$W/esc-ok.out" "$MOD/custom.pif.json"
 if command -v dash >/dev/null 2>&1; then
     new_root
     printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "x\\\\044(touch %s/pwned-octal)",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys"\n}\n' "$W" > "$MOD/custom.pif.json"
@@ -194,8 +202,8 @@ fi
 json_case okcomment "  // Build Fields
   \"MODEL\": \"x\", // a note (with punctuation)
   //\"ro.build.version.security_patch\": \"2025-01-05\","
-check "json word-start comments still migrate" test ! -e "$MOD/custom.pif.json.bak" -o -n "$(grep -F '"MODEL": "x"' "$MOD/custom.pif.json")"
-check "json word-start comments: not refused" sh -c '! grep -q Refusing "$1"' - "$W/okcomment.out"
+check "json word-start comments still migrate" sh -c 'test -e "$1.bak" && grep -qF "\"MODEL\": \"x\"" "$1"' - "$MOD/custom.pif.json"
+check "json word-start comments: not refused" sh -c '! grep -q Refusing "$1" && test -e "$2.bak" && grep -q "Advanced Settings" "$2"' - "$W/okcomment.out" "$MOD/custom.pif.json"
 
 # without a working awk the JSON check must refuse, not pass the file to the eval-based getter
 new_root
@@ -206,6 +214,7 @@ cp "$MOD/custom.pif.json" "$W/orig.json"
 rc=$?
 check "no awk: json not executed" test ! -e "$W/pwned-noawk"
 check "no awk: refused with non-zero exit" test "$rc" -ne 0
+check "no awk: refused by the awk check" has_text "$W/noawk.out" "awk is needed to check the file"
 check "no awk: original unchanged" cmp -s "$MOD/custom.pif.json" "$W/orig.json"
 
 # the JSON getter reads values as data: no eval of file content, same result on every shell

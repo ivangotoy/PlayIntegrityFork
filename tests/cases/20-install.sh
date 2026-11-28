@@ -8,7 +8,11 @@ install_module() {
         MODPATH="$NEWMOD"
         cd "$NEWMOD" && . "$NEWMOD/customize.sh"
     ) > "$W/install.out" 2>&1
+    INSTALL_RC=$?
 }
+# install_ok: the sourced customize.sh ends with a command that always succeeds, so its status says
+# little; a run that hit a shell error also leaves a line that is not an installer message
+install_ok() { [ "$INSTALL_RC" -eq 0 ] && ! grep -vqE '^(- |! | *$)' "$W/install.out"; }
 
 new_root
 NEW="$W/data/adb/modules_update/playintegrityfork"
@@ -23,7 +27,7 @@ echo 'resetprop -p --delete "persist.sys.example"' > "$MOD/uninstall.sh"
 mkdir -p "$MOD/system/product/app/Example"
 setprop sys.boot_completed 1
 install_module "$NEW"
-check "install exits 0" test "$?" -eq 0
+check "install exits 0" install_ok
 check "custom.pif.prop restored" cmp -s "$MOD/custom.pif.prop" "$NEW/custom.pif.prop"
 for f in skipaddprop skipdelprop skipmatchdevice skippersistprop uninstall.sh; do
     check "$f restored" test -f "$NEW/$f"
@@ -131,7 +135,7 @@ mkdir -p "$NEW" && cp -a "$MOD/." "$NEW/" && mkdir -p "$NEW/zygisk"
 rm -rf "$MOD"
 setprop sys.boot_completed 1
 install_module "$NEW"
-check "fresh install exits 0" test "$?" -eq 0
+check "fresh install exits 0" install_ok
 check "fresh install restores nothing" sh -c '! grep -qE "Restoring|Migrating" "$1"' - "$W/install.out"
 check "fresh install marks no old module for removal" test ! -e "$W/data/adb/modules/playintegrityfix"
 check "fresh install keeps zygisk" test -d "$NEW/zygisk"
@@ -141,7 +145,7 @@ new_root
 old_module
 setprop sys.boot_completed 1
 install_module "$NEW"
-check "old ID upgrade exits 0" test "$?" -eq 0
+check "old ID upgrade exits 0" install_ok
 check "old ID upgrade: migration announced" grep -q 'Migrating configuration to new playintegrityfork' "$W/install.out"
 for f in $OLDID_FILES; do
     check "old ID upgrade: $f carried" cmp -s "$OLD/$f" "$NEW/$f"

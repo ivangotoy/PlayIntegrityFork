@@ -68,5 +68,6 @@ console.log(bad.join(" "));
 process.exit(bad.length ? 1 : 0);
 JS
     node "$W/rows.js" "$ROOT/tests/fixtures/webui/measured.json" > "$W/rows.out" 2>&1
-    check "import: measured travel table holds ($(head -c 200 "$W/rows.out"))" test "$?" -eq 0
+    rows_rc=$?
+    check "import: measured travel table holds ($(head -c 200 "$W/rows.out"))" test "$rows_rc" -eq 0
 fi
