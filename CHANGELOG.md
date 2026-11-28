@@ -11,6 +11,7 @@
 - Fix trailing spaces/tabs of custom.pif.prop values being read as part of the value by the Zygisk module
 - Fix a custom.pif.prop holding only comments to unload the Zygisk module like a missing config
 - Fix WebUI JSON import writing values the Zygisk module would split into extra entries or cut short
+- Fix migrate.sh writing an invalid custom.pif.json for a value holding an escaped backslash
 
 ## Custom Fork v18
 
