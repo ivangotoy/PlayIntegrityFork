@@ -330,5 +330,14 @@
  "y_k_bs_space": {
   "key": "ro.zz\\ k",
   "travels": true
+ },
+ "model_quote_comma_quote": {
+  "field": "MODEL",
+  "value": "x\", \"spoofProvider\": \"0",
+  "travels": false
+ },
+ "key_quote_comma_quote": {
+  "key": "a\", \"spoofProvider",
+  "travels": false
  }
 }

@@ -402,7 +402,8 @@ async function setFlag(k,v){
 // Values are written as their literal text. Characters a prop line can't carry unchanged through
 // migrate.sh and the native reader (measured: CR, LF, tab, NUL, #, =, glob * ? [, {a,b}, double or
 // trailing spaces in values; =, NUL or a leading # in keys; in both, a backslash that starts a JSON
-// escape, which the native reader decodes) are not written: such optional entries are
+// escape, which the native reader decodes, and a quote, comma, quote sequence, which the native
+// reader turns into a further key) are not written: such optional entries are
 // skipped and their keys added to `skipped`; for a build field migrate.sh needs, the import fails.
 function jsonToProp(text, skipped = []) {
   const stripComments = t => {
@@ -418,7 +419,8 @@ function jsonToProp(text, skipped = []) {
   };
   const REQUIRED = ["MANUFACTURER", "MODEL", "FINGERPRINT", "BRAND", "PRODUCT", "DEVICE", "RELEASE", "ID", "INCREMENTAL", "TYPE", "TAGS", "SECURITY_PATCH", "DEVICE_INITIAL_SDK_INT"];
   const jsonEscape = /\\(["\\/bfnrt]|u[0-9a-fA-F]{4})/;
-  const fits = (k, v) => !/[=\r\n\0]/.test(k) && !k.startsWith("#") && !jsonEscape.test(k) &&
+  const keySplit = /" ?, ?"/;
+  const fits = (k, v) => !/[=\r\n\0]/.test(k) && !k.startsWith("#") && !jsonEscape.test(k) && !keySplit.test(k) && !keySplit.test(v) &&
     !/[\r\n\t\0#=*?[]|  |\s$|\{[^}]*,[^}]*\}/.test(v) && !jsonEscape.test(v);
   const failed = [];
   const entry = (k, v, commented) => {
