@@ -36,6 +36,8 @@ check "json: commented security_patch" has_line "$J" '    //"ro.build.version.se
 check "json: last entry closes object" test "$(tail -n 2 "$J" | tr -d '\n')" = '    "verboseLogs": "2"}'
 if command -v python3 >/dev/null 2>&1; then
     check "json: output parses after comment removal" python3 -I -c 'import json,re,sys; json.loads(re.sub(r"(?m)^\s*//.*$", "", open(sys.argv[1]).read()))' "$J"
+else
+    skip "json: output parses after comment removal (no python3)"
 fi
 
 # json -> prop round trip

@@ -140,6 +140,7 @@ JS
     printf '#!/bin/sh\nexit 1\n' > "$W/failsed/sed"; chmod 755 "$W/failsed/sed"
     PATH="$W/failsed:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofBuild=1 "$W/flag-fail.json" 2> "$W/flag-fail.err"
     check "webui setFlag, sed fails: not reported as set, nothing killed" sh -c 'test -s "$1" && ! grep -q "Spoof Build on\|Set spoofBuild\|killpi.sh" "$1"' - "$W/flag-fail.json"
+check "webui setFlag, sed fails: failure logged" grep -q "Setting spoofBuild=1 in .* failed" "$W/flag-fail.json"
     rm -f "$C"
     node "$WJS" "$WORK/webui-write-page.js" "$W" setflag spoofBuild=1 "$W/flag-nocfg.json" 2> "$W/flag-nocfg.err"
     check "webui setFlag without custom.pif.prop: not reported as set, nothing killed" sh -c 'test -s "$1" && ! grep -q "Spoof Build on\|Set spoofBuild\|killpi.sh" "$1"' - "$W/flag-nocfg.json"
@@ -153,9 +154,11 @@ JS
     printf '#!/bin/sh\nexit 1\n' > "$W/failtouch/touch"; chmod 755 "$W/failtouch/touch"
     PATH="$W/failtouch:$PATH" node "$WJS" "$WORK/webui-write-page.js" "$W" setmode random "$W/mode-fail.json" 2> "$W/mode-fail.err"
     check "webui setMode random, touch fails: not logged as done" sh -c 'test -s "$1" && ! grep -q "Create skipmatchdevice" "$1"' - "$W/mode-fail.json"
+check "webui setMode random, touch fails: failure logged" grep -q "Creating skipmatchdevice failed" "$W/mode-fail.json"
     mkdir -p "$MOD/skipmatchdevice/x"
     node "$WJS" "$WORK/webui-write-page.js" "$W" setmode match "$W/mode-rmfail.json" 2> "$W/mode-rmfail.err"
     check "webui setMode match, rm fails: not logged as done" sh -c 'test -s "$1" && ! grep -q "Remove skipmatchdevice" "$1"' - "$W/mode-rmfail.json"
+check "webui setMode match, rm fails: failure logged" grep -q "Removing skipmatchdevice failed" "$W/mode-rmfail.json"
 
     # skip* switches: a failed touch (stub) or rm (directory in the way) puts the switch back, logs the
     # error and skips the reboot toast

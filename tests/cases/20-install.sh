@@ -171,6 +171,7 @@ for order in old-first new-first; do
     rm -rf "$MOD" && mv "$NEW" "$MOD"
     if [ "$order" = old-first ]; then
         "$TEST_SH" "$OLD/uninstall.sh" > /dev/null 2>&1; rm -rf "$OLD"
+        check "old ID boot (old-first): old uninstall.sh reverted the workaround" test "$(prop persist.sys.pihooks.disable.gms_props)" = false
         "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1
     else
         "$TEST_SH" "$MOD/post-fs-data.sh" > "$W/out" 2>&1

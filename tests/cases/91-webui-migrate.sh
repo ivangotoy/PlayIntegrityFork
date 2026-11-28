@@ -20,6 +20,8 @@ for S in "$TEST_SH" mksh dash; do
     if [ -x "$L" ]; then
         "$L" < "$C" > "$W/native.out"
         check "import round trip ($S): native config gets the original MODEL" grep -qF '"MODEL":"Pixel \"Q\" Test/AA & co"' "$W/native.out"
+    else
+        skip "import round trip ($S): native config (the 55-native-config loader was not built)"
     fi
     cp "$FX/clean.expected.prop" "$C"
     (cd "$MOD" && "$S" "$MOD/migrate.sh" -p "$C") > "$W/c.out" 2>&1
