@@ -10,6 +10,7 @@
 - Fix autopif4 to stop and keep the existing custom.pif.prop when migrate.sh fails to convert the new print
 - Fix trailing spaces/tabs of custom.pif.prop values being read as part of the value by the Zygisk module
 - Fix a custom.pif.prop holding only comments to unload the Zygisk module like a missing config
+- Fix WebUI JSON import writing values the Zygisk module would split into extra entries
 
 ## Custom Fork v18
 
