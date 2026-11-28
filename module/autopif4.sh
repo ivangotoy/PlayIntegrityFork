@@ -236,7 +236,7 @@ if [ -f "$MIGRATE" ]; then
   [ -d /data/adb/tricky_store -o -d /data/adb/teesim -o -d /data/adb/omk ] && unset PATCH_COMMENT;
   item "Converting pif.prop to custom.pif.prop ...";
   rm -f pif.json custom.pif.json custom.pif.prop;
-  sh $MIGRATE -i pif.prop;
+  sh $MIGRATE -i pif.prop || die "Failed to convert pif.prop with migrate.sh";
   grep_config() {
     if [ -f "$2" ]; then
       case $2 in

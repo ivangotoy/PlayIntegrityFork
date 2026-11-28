@@ -56,6 +56,17 @@ check "unsafe advanced setting value not carried" has_line "$MOD/custom.pif.prop
 check "fingerprint spoofVendingFinger with comma tags carried" has_line "$MOD/custom.pif.prop" "spoofVendingFinger=google/zzother/zzother:98/ZZ0A.240101.001/7654321:user/release-keys,test-keys"
 check "verboseLogs carried" has_line "$MOD/custom.pif.prop" "verboseLogs=3"
 
+# a failed migrate.sh conversion (e.g. a write error) installs nothing: the live config stays as it was
+new_root
+write_fetch_stubs "$ROOT/tests/fixtures/autopif4"
+printf 'MODEL=Pixel Old\nspoofSignature=1\n' > "$MOD/custom.pif.prop"
+cp "$MOD/custom.pif.prop" "$W/old.prop"
+printf '#!/bin/sh\necho "migrate stub: write failed" >&2\nexit 1\n' > "$MOD/migrate.sh"
+run_autopif
+check "failed migrate.sh: autopif4 fails" test "$?" -ne 0
+check "failed migrate.sh: live custom.pif.prop unchanged, no backup made" sh -c 'cmp -s "$1" "$2" && test ! -e "$1.bak"' - "$MOD/custom.pif.prop" "$W/old.prop"
+check "failed migrate.sh: Play processes not killed" sh -c '! grep -q "^killall" "$1"' - "$W/calls.log"
+
 # downloaded values with characters that break the config or sed sinks are refused
 new_root
 mkdir -p "$W/fix" && cp "$ROOT"/tests/fixtures/autopif4/* "$W/fix/"
