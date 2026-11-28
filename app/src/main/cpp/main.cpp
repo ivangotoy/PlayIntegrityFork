@@ -395,8 +395,8 @@ public:
         }
 
         json = nlohmann::json::parse(configString, nullptr, false, true);
-        if (json.is_discarded() || !json.is_object()) {
-            LOGD("Couldn't parse config file");
+        if (json.is_discarded() || !json.is_object() || json.empty()) {
+            LOGD("Couldn't parse config file, or it holds no entries");
             json = nullptr;
             dexVector.clear();
             api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
