@@ -343,4 +343,18 @@ for SETTING in $ADVSETTINGS; do
   eval echo "$EVALPRE$SETTING\$MID\$$SETTING\$POST";
 done) | sed '$s/,/\n}/' > "$OUT";
 
+# values read from json come back with \\ decoded to \ (as the old eval did): in a json output a
+# backslash that starts no JSON escape is written doubled, so the file stays valid JSON for the module
+if [ "$FORMAT" = json ]; then
+  LC_ALL=C awk '{
+    s = $0; n = length(s); o = "";
+    for (i = 1; i <= n; i++) {
+      c = substr(s, i, 1);
+      if (c == "\\") { d = substr(s, i + 1, 1); if (d ~ /["\\\/bfnrtu]/) { o = o c d; i++; } else o = o "\\\\"; }
+      else o = o c;
+    }
+    print o;
+  }' "$OUT" > "$OUT.tmp" && mv -f "$OUT.tmp" "$OUT" || rm -f "$OUT.tmp";
+fi;
+
 [ "$INSTALL" ] || cat "$OUT";

@@ -228,7 +228,9 @@ for S in "$TEST_SH" mksh dash; do
     new_root
     printf '{\n  "MANUFACTURER": "Google",\n  "MODEL": "a\\/b\\u0041\\tc\\\\d",\n  "FINGERPRINT": "google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys",\n  "verboseLogs": "0"\n}\n' > "$MOD/custom.pif.json"
     (cd "$MOD" && "$S" "$MOD/migrate.sh" -f "$MOD/custom.pif.json") > "$W/lit.out" 2>&1
-    check "json escapes written literally under $S" has_line "$MOD/custom.pif.json" '    "MODEL": "a\/b\u0041\tc\d",'
+    # JSON escapes are written literally; the \\ that reads back as one backslash is written doubled
+    # again, so the file stays valid JSON (a lone \d made the module drop the whole config)
+    check "json escapes written literally under $S" has_line "$MOD/custom.pif.json" '    "MODEL": "a\/b\u0041\tc\\d",'
     printf 'MANUFACTURER=Google\nMODEL=a\\nb\\u0041\nFINGERPRINT=google/zzdev/zzdev:99/ZZ1A.250101.001/1234567:user/release-keys\n' > "$MOD/custom.pif.prop"
     (cd "$MOD" && "$S" "$MOD/migrate.sh" -p "$MOD/custom.pif.prop") > "$W/litp.out" 2>&1
     check "prop backslashes written literally under $S" has_line "$MOD/custom.pif.prop" 'MODEL=a\nb\u0041'
