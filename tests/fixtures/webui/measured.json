@@ -354,5 +354,9 @@
   "field": "MODEL",
   "value": "x\",\"spoofProvider\":\"0",
   "travels": false
+ },
+ "key_quote_colon": {
+  "key": "a\": true, \"b",
+  "travels": false
  }
 }
