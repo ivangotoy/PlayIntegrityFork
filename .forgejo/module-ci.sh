@@ -207,7 +207,6 @@ print(len(d), m)' "$REL/releases.json")" || die "release list page $page is not 
     [ "${got% *}" = 0 ] && break
     [ "${got#* }" -le "$LAST_VC" ] || LAST_VC="${got#* }"
     page=$((page + 1))
-    [ "$page" -le 1000 ] || die "release list has more than 1000 pages"
 done
 if [ "$VC" -le "$LAST_VC" ]; then
     log "versionCode $VC is not above the published $LAST_VC: using $((LAST_VC + 1))"
