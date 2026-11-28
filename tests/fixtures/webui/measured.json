@@ -339,5 +339,20 @@
  "key_quote_comma_quote": {
   "key": "a\", \"spoofProvider",
   "travels": false
+ },
+ "model_quote_comma_comment": {
+  "field": "MODEL",
+  "value": "x\", //y",
+  "travels": false
+ },
+ "model_quote_comment": {
+  "field": "MODEL",
+  "value": "x\" //y",
+  "travels": false
+ },
+ "model_quote_nospace_key": {
+  "field": "MODEL",
+  "value": "x\",\"spoofProvider\":\"0",
+  "travels": false
  }
 }
